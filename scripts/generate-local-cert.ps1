@@ -1,45 +1,41 @@
-# generate-local-cert.ps1
-
 param (
-    [string]$CertName = "localhost",
-    [string]$CertFolder = "certs"
+    [string[]]$DnsNames = @("localhost"),
+    [switch]$InstallToRoot = $false
 )
 
-# Ensure output folder exists
-if (-not (Test-Path -Path $CertFolder)) {
-    New-Item -Path $CertFolder -ItemType Directory | Out-Null
+$certName = $DnsNames[0]
+$certPath = Join-Path $PSScriptRoot "..\certs"
+$pfxPath = Join-Path $certPath "$certName.pfx"
+$cerPath = Join-Path $certPath "$certName.cer"
+
+if (-not (Test-Path $certPath)) {
+    New-Item -Path $certPath -ItemType Directory | Out-Null
 }
 
-# Generate self-signed certificate
-$cert = New-SelfSignedCertificate `
-    -DnsName $CertName `
-    -FriendlyName "MsQuic-Test-$CertName" `
-    -KeyUsageProperty Sign `
-    -KeyUsage DigitalSignature `
-    -CertStoreLocation "cert:\LocalMachine\My" `
-    -HashAlgorithm SHA256 `
-    -Provider "Microsoft Software Key Storage Provider" `
-    -KeyExportPolicy Exportable
-
-# Export to PFX
-$pfxPath = Join-Path $CertFolder "$CertName.pfx"
+$cert = New-SelfSignedCertificate -DnsName $DnsNames -CertStoreLocation "cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(10)
+Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
 Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password (ConvertTo-SecureString -String "password" -Force -AsPlainText) | Out-Null
 
-# Export to CER
-$cerPath = Join-Path $CertFolder "$CertName.cer"
-Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+if ($InstallToRoot) {
+    $rootStore = "cert:\LocalMachine\Root"
+    Import-Certificate -FilePath $cerPath -CertStoreLocation $rootStore | Out-Null
+    Write-Host "Installing certificate to Root..."
+}
 
-Write-Output "Generated certificate: $CertName"
-Write-Output " - CER:  $cerPath"
-Write-Output " - PFX:  $pfxPath"
+Write-Host "Generated certificate: $certName"
+Write-Host " - CER:  $cerPath"
+Write-Host " - PFX:  $pfxPath"
 
-# Calculate SHA256 and print byte array
 $hash = Get-FileHash -Path $cerPath -Algorithm SHA256
+$sha256Hex = $hash.Hash.ToUpper()
+Write-Host "`n=== SHA256 ==="
+Write-Host $sha256Hex
 
-# Convert hex string to byte array
-$hashBytes = -split $hash.Hash -replace '..', { "0x$($_)" } | ForEach-Object { [byte]$_ }
+$sha256Bytes = ($sha256Hex -split '(.{2})' | Where-Object { $_ }) -join ', 0x'
+Write-Host "`n=== SHA256 Byte Array (PowerShell format) ==="
+Write-Host "0x$sha256Bytes"
 
-# Print SHA256 byte array
-$byteArrayString = ($hashBytes | ForEach-Object { "0x{0:X2}" -f $_ }) -join ", "
-Write-Output "`n=== SHA256 Byte Array ==="
-Write-Output $byteArrayString
+$thumbprint = $cert.Thumbprint
+Write-Host "`nYou can use this hash in your Visual Studio project configuration or QUIC server setup."
+Write-Host "`n=== Certificate Thumbprint (for QUIC/VS usage) ==="
+Write-Host $thumbprint
