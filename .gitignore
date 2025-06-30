@@ -1,0 +1,17 @@
+output/*
+*.pfx
+*.cer
+*.zip
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build output
+bin/
+obj/
+
+# Others
+*.pdb
+*.log

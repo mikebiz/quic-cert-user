@@ -1,0 +1,1 @@
+"%ProgramFiles%\Google\Chrome\Application\chrome.exe" --ignore-certificate-errors
