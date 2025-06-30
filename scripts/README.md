@@ -100,4 +100,39 @@ quic-cert-user-main/
 * These scripts disable or bypass TLS validation during Chrome launch for local testing.
 * **Never use in production environments.**
 
+### generate-local-cert.ps1
+Great — below is a **unified PowerShell script** called `generate-local-cert.ps1` that intelligently:
+
+1. **Creates** a self-signed certificate for `CN=localhost` (or any `DnsName`).
+2. **Exports** both `.pfx` and `.cer` files.
+3. **Prints** the **Thumbprint** and **SHA256 hash** of the exported `.cer`.
+4. **Can be extended** or customized easily.
+
+---
+
+## ✅ `generate-local-cert.ps1`
+
+### 🧪 Example Usages
+
+#### **Default (localhost only):**
+
+```powershell
+.\generate-local-cert.ps1
+```
+
+#### **With custom DnsNames:**
+
+```powershell
+.\generate-local-cert.ps1 -DnsNames "localhost", "127.0.0.1", "mytest.local"
+```
+
+#### **Add to Trusted Root CA store (DEV ONLY!):**
+
+```powershell
+.\generate-local-cert.ps1 -InstallToRoot
+```
+
+---
+
+Would you like this wrapped with a `.bat` to run easily from Explorer or zipped with a README?
 
