@@ -1,17 +1,24 @@
-output/*
-*.pfx
-*.cer
-*.zip
+# Ignore certificates
+certs/*.pfx
+certs/*.cer
 
-# Visual Studio
+# Ignore temporary files
+*.log
+*.tmp
+*.bak
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# VS Code / Visual Studio
+.vscode/
 .vs/
 *.user
 *.suo
 
-# Build output
-bin/
-obj/
-
-# Others
-*.pdb
-*.log
+# PowerShell and batch output
+*.ps1xml
+*.pssc
+*.psd1
