@@ -17,6 +17,7 @@ Desktop.ini
 .vs/
 *.user
 *.suo
+*.jar
 
 # PowerShell and batch output
 *.ps1xml
