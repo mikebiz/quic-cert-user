@@ -117,12 +117,38 @@ cat certificate.crt ca-bundle.crt > fullchain.pem
 #### ✅ MsQuic Config:
 
 In your code (or configuration), specify:
+- This code assumes you have entered the thumbprint of the cert in either the VS 2022 setting or as a commandline param (--cert_hash:_)
+- [need image of VS2022 setup for this]
+- I think ideal setup is to use the hash and not a file directly(?)
 
 ```cpp
-QUIC_CREDENTIAL_CONFIG credConfig;
-credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-credConfig.CertificateFile.PrivateKeyFile = "testquic.key";
-credConfig.CertificateFile.CertificateFile = "fullchain.pem";
+    // converts thumbprint from commandline
+    std::array<uint8_t, 20> shaHash{};
+    if (certHashArg.empty() || !ParseHexHash(certHashArg, shaHash)) {
+        std::cerr << "Usage: server -cert_hash:<40-char SHA1>\n";
+        return 1;
+    }
+
+    QUIC_CERTIFICATE_HASH_STORE certHashStore = {};
+    certHashStore.Flags = QUIC_CERTIFICATE_HASH_STORE_FLAG_MACHINE_STORE;
+    std::copy(shaHash.begin(), shaHash.end(), certHashStore.ShaHash);
+    strcpy_s(certHashStore.StoreName, "MY");
+
+    QUIC_CREDENTIAL_CONFIG credConfig = {};
+    credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_HASH_STORE;
+    credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+    credConfig.CertificateHashStore = &certHashStore;
+
+    std::cout << "SHA1 input string: " << certHashArg << "\n";
+    for (auto b : shaHash)
+        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
+    std::cout << std::endl;
+
+    QUIC_STATUS status = MsQuic->ConfigurationLoadCredential(Configuration, &credConfig);
+    if (QUIC_FAILED(status)) {
+        std::cerr << "LoadCredential failed: 0x" << std::hex << status << "\n";
+        return 1;
+    }
 ```
 
 * Ensure you load both the private key and full chain.
