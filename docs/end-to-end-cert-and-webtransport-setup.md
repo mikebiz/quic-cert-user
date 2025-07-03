@@ -1,4 +1,7 @@
 ﻿
+# Overview
+The following is representive of a process followed to enable a clean test model between Chrome and a QUIC test service via WebTransport.  Because of the enhanced security built into the browser and QUIC itself, starting with a domain and dv certs is the best approach even in pure dev/experimentation.  Trying this with self-siged local certs is problematic at best.
+
 ![Diagram](images/end-to-end-process-sequence.png)
 
 [🔍 View SVG](svg/end-to-end-process-sequence.svg)  
