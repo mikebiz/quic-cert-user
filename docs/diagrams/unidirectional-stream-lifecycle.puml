@@ -1,0 +1,20 @@
+@startuml
+actor Client
+participant "Server App" as ServerApp
+participant "HQUIC Connection" as Conn
+participant "HQUIC Stream\n(Unidirectional)" as Stream
+
+== Server sends unidirectional stream ==
+ServerApp -> Conn : StreamOpen(UNIDIRECTIONAL)
+ServerApp -> Stream : StreamStart()
+ServerApp -> Stream : StreamSend(control frame)
+
+== Client receives ==
+Conn -> ServerApp : QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED
+ServerApp -> Stream : SetCallbackHandler(StreamCallback)
+Stream -> ServerApp : QUIC_STREAM_EVENT_RECEIVE
+
+== Shutdown ==
+Stream -> ServerApp : QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
+ServerApp -> Stream : StreamClose()
+@enduml
