@@ -1,3 +1,6 @@
+# OUTDATED AND NEEDS UPDATES TO BE IN SYNC TO NEW FOLDER STURCTURE!!!!
+---
+
 # QUIC Certificate Utility & Chrome Launcher
 
 This repository provides scripts for generating self-signed certificates for `localhost`, configuring your local certificate store, and launching Chrome with QUIC/WebTransport support while bypassing certificate verification for local testing purposes.
