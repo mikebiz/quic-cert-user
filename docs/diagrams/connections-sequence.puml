@@ -1,0 +1,53 @@
+﻿@startuml
+actor Application
+participant "MsQuic Library" as MSQ
+participant Registration
+participant Configuration
+participant Connection
+participant RemotePeer
+
+== 1. Initialize Library ==
+Application -> MSQ         : MsQuicOpen2(ClientVersion)\n→ QUIC_TABLE*
+note right of MSQ          : Error if version mismatch
+
+== 2. Create Registration ==
+Application -> Registration: RegistrationOpen(\n RegConfig{AppName,Profile},\n Context)\n→ HQUIC Registration
+note right of Registration : Error if invalid config
+
+== 3. Create Configuration ==
+Application -> Configuration: ConfigurationOpen(\n Registration,\n AlpnBuffers,\n Settings,\n Context)\n→ HQUIC Configuration
+note right of Configuration: Must set TLS credentials first
+
+== 4. Allocate Connection ==
+Application -> Connection   : ConnectionOpen(\n Registration,\n Handler,\n Context)\n→ HQUIC Connection
+note right of Connection    : Error if out of memory
+
+== 5. Start / Handshake ==
+Application -> Connection   : ConnectionStart(\n Connection,\n AF_UNSPEC,\n ServerName,Port)
+note over Connection        : Client: send Initial\nServer: wait for packet
+
+Connection -> RemotePeer    : QUIC Initial / Handshake
+RemotePeer -> Connection    : Handshake Response
+note right of Connection    : Error → ShutdownInitiated
+
+== 6. Connected Event ==
+Connection -> Connection    : OnEvent(CONNECTED)
+Connection --> Application  : QUIC_CONNECTION_EVENT_CONNECTED
+
+== Data Exchange (Streams) ==
+... (omitted) ...
+
+alt Graceful Close
+    Application -> Connection: ConnectionShutdown(Connection, SUCCESS)
+else Abort/Error
+    Connection -> Connection: OnEvent(SHUTDOWN_INITIATED)\n(error code)
+end
+
+Connection -> RemotePeer    : CloseNotify
+Connection -> Connection    : OnEvent(SHUTDOWN_COMPLETE)
+Connection --> Application  : QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+
+== 8. Close Handle ==
+Application -> Connection    : ConnectionClose(Connection)
+note right of Connection    : Frees resources\nNo further callbacks
+@enduml
