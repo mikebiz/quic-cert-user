@@ -1,0 +1,26 @@
+﻿@startuml
+actor Application
+participant "MsQuic Library" as MSQ
+participant Registration
+participant Configuration
+participant Listener
+
+== Setup ==
+Application -> MSQ           : MsQuicOpen2()
+Application -> Registration  : RegistrationOpen(...)
+Application -> Configuration : ConfigurationOpen(...)
+Application -> Listener      : ListenerOpen(Registration,\n Handler,Context)\n→ HQUIC Listener
+
+== Start Listening ==
+Application -> Listener      : ListenerStart(Listener,\n 0.0.0.0:443)
+Listener -> Listener         : OnEvent(LISTENER_STARTED)
+Listener --> Application     : QUIC_LISTENER_EVENT_LISTENER_STARTED
+
+== Stop Listening ==
+Application -> Listener      : MsQuicListenerStop(Listener)
+Listener -> Listener         : OnEvent(LISTENER_STOPPED)
+Listener --> Application     : QUIC_LISTENER_EVENT_LISTENER_STOPPED
+
+== Teardown ==
+Application -> Listener      : MsQuicListenerClose(Listener)
+@enduml

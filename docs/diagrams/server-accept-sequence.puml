@@ -1,0 +1,28 @@
+@startuml
+actor Application
+participant Listener
+participant Connection
+participant RemotePeer
+
+== Incoming Connection ==
+Listener -> Application : OnEvent(NEW_CONNECTION)\n(Event->Connection)
+
+== Bind Handlers ==
+Application -> Connection : MsQuicSetCallbackHandler(\n Connection, ConnCallback, Ctx)
+Application -> Connection : (optional) MsQuicConnectionSetParam(...)
+
+alt Reject
+    Application -> Connection : MsQuicConnectionShutdown(\n Connection, REFUSED, 0)
+else Accept
+    note right: MsQuic continues handshake using\n listener’s Configuration
+end
+
+== Handshake & Connected ==
+Connection -> RemotePeer : Initial / Handshake
+RemotePeer -> Connection : Handshake Response
+Connection -> Connection   : OnEvent(CONNECTED)
+Connection --> Application : QUIC_CONNECTION_EVENT_CONNECTED
+
+== Serve Streams & Shutdown ==
+... (stream events, then shutdown as above) ...
+@enduml
