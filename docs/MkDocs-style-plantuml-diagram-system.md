@@ -155,6 +155,12 @@ ServerApp -> Stream : StreamClose()
 ```
 
 ---
+## Unidirectional Stream Lifecycle
+
+![Diagram](images/unidirectional-stream-lifecycle.png)
+
+[🔍 View SVG](../svg/unidirectional-stream-lifecycle.svg)  
+[🧾 View Source (.puml)](../diagrams/unidirectional-stream-lifecycle.puml)
 
 ## 7. 🧱 Markdown Usage in `docs/*.md`
 
