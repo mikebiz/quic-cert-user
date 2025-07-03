@@ -1,0 +1,20 @@
+@startuml
+actor Application
+participant Connection as C
+participant RemotePeer as S
+
+== Established Connection ==
+Application -> C : (after CONNECTED)
+C -> S : Application data
+
+== Network path changes ==
+note over S: NAT rebinding / new IP
+S -> C : Path Challenge
+C -> S : Path Response
+C -> C : OnEvent(PEER_ADDRESS_CHANGED)
+C --> Application : QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED
+
+== Continued Data Flow on new path ==
+Application -> C : Send Data
+C -> S : Data on new 5-tuple
+@enduml

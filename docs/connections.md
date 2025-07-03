@@ -188,11 +188,64 @@ MsQuicConnectionClose(
 * **No callbacks** fire afterward.
 * Frees all memory and stops any pending retries.
 
----
-
 ![Diagram](images/connections-sequence.png)
 
 [🔍 View SVG](svg/connections-sequence.svg)  
 [🧾 View Source (.puml)](diagrams/connections-sequence.puml)
+
+---
+
+## Version Negotiation
+
+When a client and server do not initially agree on a QUIC version, the server sends a Version Negotiation packet. MsQuic’s library handles the low-level wire logic, automatically retrying with a supported version. From your application’s perspective, you simply call `MsQuicConnectionStart()`, and the library transparently retries under the hood until the handshake can proceed.
+
+**Key APIs & Events**
+
+1. **ConnectionOpen** → `QUIC_CONNECTION_EVENT_CONNECTED` only fires once a supported version is negotiated and the handshake completes.
+2. **ConnectionStart** → embeds your offered versions in the Initial packet.
+3. **Internal Retry** → no application callback; the library resends Initial with negotiated version after receiving Version Negotiation.
+
+![Diagram](images/connections-version-negotions-sequence.png)
+
+[🔍 View SVG](svg/connections-version-negotions-sequence.svg)  
+[🧾 View Source (.puml)](connections-version-negotions-sequence.puml)
+
+---
+
+## Stateless Retry
+
+Stateless Retry enforces source-address validation. On the first Initial packet, the server responds with a Retry containing a token. The client must resend its Initial including that token, at which point the server proceeds with the handshake.
+
+**Key APIs & Events**
+
+1. **ConfigurationOpen** → ensure `RetryEnabled` is true in `QUIC_SETTINGS`.
+2. **ConnectionStart** → send Initial (no token).
+3. **Internal Library Handling** → upon Retry packet, library resends Initial with token automatically.
+4. **Connected Callback** → application sees only a single `CONNECTED` event when handshake succeeds.
+
+![Diagram](images/connections-stateless-retry-sequence.png)
+
+[🔍 View SVG](svg/connections-stateless-retry-sequence.svg)  
+[🧾 View Source (.puml)](connections-stateless-retry-sequence.puml)
+
+---
+
+## Connection Migration
+
+QUIC connections can survive changes in the client’s IP or port (e.g., NAT rebinding or network failover). MsQuic exposes these changes via an event so the application can react (e.g., by updating peer address parameters or logging).
+
+**Key APIs & Events**
+
+1. **QUIC\_CONNECTION\_EVENT\_PEER\_STREAM\_STARTED** – not related.
+2. **Internal Path Probing** – library automatically probes the new path.
+3. **QUIC\_CONNECTION\_EVENT\_PEER\_ADDRESS\_CHANGED** – callback to application.
+4. **Optional**: call `MsQuicConnectionSetParam(Connection, QUIC_PARAM_CONN_REMOTE_ADDRESS, …)` if you need to override the endpoint.
+
+![Diagram](images/connections-migration-sequence.png)
+
+[🔍 View SVG](svg/connections-migration-sequence.svg)  
+[🧾 View Source (.puml)](connections-migration-sequence.puml)
+
+---
 
 

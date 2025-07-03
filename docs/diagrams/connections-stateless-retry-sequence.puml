@@ -1,0 +1,23 @@
+@startuml
+actor Application
+participant Connection as C
+participant RemotePeer as S
+
+== Client sends first Initial ==
+Application -> C : ConnectionStart(...)
+C -> S : Initial(token=none)
+
+== Server issues Retry ==
+alt Server demands retry
+    S -> C : Retry(token=T1)
+    note right: Stateless Retry includes T1
+    C -> C : (library appends T1)
+    C -> S : Initial(token=T1)
+end
+
+== Handshake proceeds ==
+C -> S : Handshake
+S -> C : Handshake Response
+C -> C : OnEvent(CONNECTED)
+C --> Application : QUIC_CONNECTION_EVENT_CONNECTED
+@enduml

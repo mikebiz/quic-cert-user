@@ -1,0 +1,21 @@
+@startuml
+actor Application
+participant Connection as C
+participant RemotePeer as S
+
+== Start with unsupported version ==
+Application -> C : ConnectionStart(...)\n(offers [v99, v98, v1])
+C -> S : Initial(v99)
+alt Server doesn’t support v99
+    S -> C : Version Negotiation([v1, v2])
+    note right: Server lists supported versions
+    C -> C : (library picks v1)
+    C -> S : Initial(v1)
+end
+
+== Handshake on negotiated version ==
+C -> S : Handshake(v1)
+S -> C : Handshake Response
+C -> C : OnEvent(CONNECTED)
+C --> Application : QUIC_CONNECTION_EVENT_CONNECTED
+@enduml
