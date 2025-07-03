@@ -224,6 +224,3 @@ It encapsulates:
 * Cross-environment consistency
 * Common failure diagnostics
 
----
-
-Let me know if you’d like this exported to PDF, Markdown, or Word format.
