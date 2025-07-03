@@ -132,7 +132,3 @@ Great — below is a **unified PowerShell script** called `generate-local-cert.p
 .\generate-local-cert.ps1 -InstallToRoot
 ```
 
----
-
-Would you like this wrapped with a `.bat` to run easily from Explorer or zipped with a README?
-
