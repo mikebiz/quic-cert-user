@@ -169,8 +169,8 @@ ServerApp -> Stream : StreamClose()
 
 ![Diagram](images/unidirectional-stream-lifecycle.png)
 
-[🔍 View SVG](../svg/unidirectional-stream-lifecycle.svg)  
-[🧾 View Source (.puml)](../diagrams/unidirectional-stream-lifecycle.puml)
+[🔍 View SVG](svg/unidirectional-stream-lifecycle.svg)  
+[🧾 View Source (.puml)](diagrams/unidirectional-stream-lifecycle.puml)
 ```
 
 ---

@@ -1,0 +1,38 @@
+@startuml
+actor "User (Sr. Principal SDE)" as User
+participant "GoDaddy\n(DNS Registrar)" as GoDaddy
+participant "Namecheap\n(Certificate Authority)" as Namecheap
+participant "Chrome Browser" as Chrome
+participant "Test QUIC/WebTransport Server\n(MsQuic + TLS)" as Server
+
+== Domain Registration and DNS Setup ==
+User -> GoDaddy : Register Domain (e.g. bmobile.biz)
+User -> GoDaddy : Login to GoDaddy DNS dashboard
+User -> GoDaddy : Create Subdomain (e.g. testquic.bmobile.biz)
+
+== Certificate Purchase and Setup ==
+User -> Namecheap : Purchase DV SSL Cert (5yr)
+User -> Namecheap : Start Certificate Activation
+Namecheap -> User : Request CSR + Validation Method
+User -> Server : Generate CSR using OpenSSL (CN=testquic.bmobile.biz)
+User -> Namecheap : Upload CSR
+User -> GoDaddy : Create DNS TXT Record (for DNS-01 validation)
+Namecheap -> GoDaddy : Poll for DNS validation
+GoDaddy -> Namecheap : Confirm TXT record
+Namecheap -> User : Issue Signed Certificate (.crt + CA bundle)
+
+== Server Installation and Configuration ==
+User -> Server : Install Private Key (.key) + Certificate (.crt)
+User -> Server : Configure MsQuic to load certificate chain
+User -> Server : Bind to testquic.bmobile.biz:443 with TLS
+
+== Client-Side Validation ==
+User -> Chrome : Navigate to https://testquic.bmobile.biz
+Chrome -> Server : QUIC + HTTP/3 + WebTransport Request
+Server -> Chrome : Respond with 200 OK + WebTransport Upgrade
+Chrome -> Server : Open Bidirectional/Unidirectional Streams
+note right of Chrome
+If cert trusted, no warnings.
+If misconfigured, cert error shown.
+end note
+@enduml
