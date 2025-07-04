@@ -1,0 +1,26 @@
+@startuml
+actor Application
+participant Connection as C
+participant Stream as S
+participant RemotePeer as R
+
+== Incoming Stream ==
+R -> C : Initial Stream Frame\n (peer opens)
+C -> C : OnEvent(PEER_STREAM_STARTED)\n(NewStream=Event->STREAM)
+C -> Application : QUIC_STREAM_EVENT_PEER_STREAM_STARTED
+
+== Server Accepts ==
+Application -> S : MsQuicSetCallbackHandler(\n NewStream, StreamCallback, Ctx)
+Application -> S : MsQuicStreamStart(S, NONE)\n(open send side)
+
+== Data Exchange ==
+Application -> S : MsQuicStreamSend(...)
+S -> R : Data
+R -> S : Data
+S -> S : OnEvent(RECEIVE)\n(BufferList, Flags)
+
+== Close ==
+Application -> S : MsQuicStreamShutdown(S, GRACEFUL, 0)
+S -> S : OnEvent(SHUTDOWN_COMPLETE)
+Application -> S : MsQuicStreamClose(S)
+@enduml

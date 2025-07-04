@@ -541,3 +541,133 @@ When a peer’s Initial packet arrives, the listener emits a **NEW\_CONNECTION**
 
 ---
 
+Below is **Section 4: Streams**—covering both unidirectional and bidirectional streams, their creation, flow-control, metrics, and usage scenarios. You can copy the PlantUML blocks into your `.puml` files to generate the diagrams.
+
+---
+
+# Section 4: Streams
+
+## 4.1 Stream Types & When to Use
+
+| Stream Type        | Directionality      | Use Cases                                                                                 |
+| ------------------ | ------------------- | ----------------------------------------------------------------------------------------- |
+| **Unidirectional** | One-way (peer→peer) | • Server push of events/notifications<br>• Client sending telemetry or logs without reply |
+| **Bidirectional**  | Two-way (peer⇄peer) | • RPC-style request/response<br>• Full duplex chat, streaming media (audio/video)         |
+
+> **Tip:** favor unidirectional streams when you don’t need the peer to reply on the same stream—to reduce head-of-line blocking and simplify flow control.
+
+---
+
+## 4.2 Stream Creation & Lifecycle
+
+### Core APIs
+
+| API                                      | Parameter    | Type                           | Description                                                |
+| ---------------------------------------- | ------------ | ------------------------------ | ---------------------------------------------------------- |
+| **MsQuicStreamOpen**                     | `Connection` | `HQUIC`                        | The connection handle.                                     |
+|                                          | `Flags`      | `QUIC_STREAM_OPEN_FLAGS`       | `QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL` or `BIDIRECTIONAL`. |
+|                                          | `Handler`    | `QUIC_STREAM_CALLBACK_HANDLER` | Your callback for `QUIC_STREAM_EVENT_*`.                   |
+|                                          | `Context`    | `void*`                        | User pointer for stream state.                             |
+|                                          | `Stream`     | `HQUIC*`                       | OUT: new stream handle.                                    |
+| **MsQuicStreamStart**                    | `Stream`     | `HQUIC`                        | Stream handle from `StreamOpen`.                           |
+|                                          | `Flags`      | `QUIC_STREAM_START_FLAGS`      | `NONE` (defaults) or `ASYNC`.                              |
+| **QUIC\_STREAM\_EVENT\_START\_COMPLETE** | *Callback*   | `QUIC_STREAM_EVENT`            | Signals send side is open (or error).                      |
+| **MsQuicStreamShutdown**                 | `Stream`     | `HQUIC`                        | Stream handle.                                             |
+|                                          | `Flags`      | `QUIC_STREAM_SHUTDOWN_FLAGS`   | e.g. `GRACEFUL` vs `ABORT`.                                |
+|                                          | `ErrorCode`  | `uint64_t`                     | 0 (normal) or error code.                                  |
+| **MsQuicStreamClose**                    | `Stream`     | `HQUIC`                        | Frees stream handle; no further callbacks.                 |
+
+### Sequence Diagram: Stream Creation & Open
+
+**Unidirectional (Client→Server)**
+
+![Diagram](images/streams-unidirectional-sequence.png)
+
+[🔍 View SVG](svg/streams-unidirectional-sequence.svg)  
+[🧾 View Source (.puml)](diagrams/streams-unidirectional-sequence.puml)
+
+---
+
+**Bidirectional (Server⇄Client)**
+
+
+**Unidirectional (Client→Server)**
+
+![Diagram](images/streams-bidirectional-sequence.png)
+
+[🔍 View SVG](svg/streams-bidirectional-sequence.svg)  
+[🧾 View Source (.puml)](diagrams/streams-bidirectional-sequence.puml)
+
+---
+
+## 4.3 Flow Control & Backpressure
+
+QUIC enforces per-stream and connection-level flow control. You can tune windows via `MsQuicConfigurationSetParam` or `MsQuicConnectionSetParam`:
+
+| Param ID                                | Level      | Description                                 |
+| --------------------------------------- | ---------- | ------------------------------------------- |
+| `QUIC_PARAM_CONN_STREAM_WINDOW`         | Connection | Max concurrent *new* streams peer may open. |
+| `QUIC_PARAM_STREAM_ID`                  | Stream     | The numeric ID for this stream.             |
+| `QUIC_PARAM_STREAM_PRIORITY`            | Stream     | Priority weight for scheduler.              |
+| `QUIC_PARAM_STREAM_RECV_SIZE`           | Stream     | Max bytes app can buffer before reading.    |
+| `QUIC_PARAM_CONN_FLOW_CONTROL_WINDOW`   | Conn       | Max bytes in flight on connection.          |
+| `QUIC_PARAM_STREAM_FLOW_CONTROL_WINDOW` | Stream     | Max bytes in flight on this stream.         |
+
+> **Backpressure:** if send buffers fill beyond `FLOW_CONTROL_WINDOW`, `MsQuicStreamSend` returns `QUIC_STATUS_BUFFER_TOO_SMALL`. You must pause sending, wait for `QUIC_STREAM_EVENT_PEER_SEND_ABORTED` or window‐update via events, then resume.
+
+---
+
+## 4.4 Metrics & Telemetry
+
+You can query runtime stats via `MsQuicConnectionGetParam` or `MsQuicStreamGetParam`:
+
+| Metric Param ID                       | Level      | Description                                                       |
+| ------------------------------------- | ---------- | ----------------------------------------------------------------- |
+| `QUIC_PARAM_CONN_STATISTICS`          | Connection | `QUIC_CONNECTION_STATISTICS` (packets sent/received, bytes, etc.) |
+| `QUIC_PARAM_STREAM_STATISTICS`        | Stream     | `QUIC_STREAM_STATISTICS` (frames sent/received, retransmits)      |
+| `QUIC_PARAM_CONN_DATAPATH_STATISTICS` | Connection | Low-level NIC stats                                               |
+
+```cpp
+QUIC_STATISTICS stats{};
+uint32_t Size = sizeof(stats);
+MsQuicConnectionGetParam(Connection,
+    QUIC_PARAM_CONN_STATISTICS,
+    &Size,
+    &stats);
+// inspect stats.RecvBytes, stats.SentPackets, etc.
+```
+
+> **Tip:** poll periodically (e.g. every second) or fetch on key events (e.g. shutdown) to log performance.
+
+---
+
+## 4.5 API Parameter Tables
+
+### Stream Open & Start
+
+| API                   | Parameter    | Type                           | Description                      |
+| --------------------- | ------------ | ------------------------------ | -------------------------------- |
+| **MsQuicStreamOpen**  | `Connection` | `HQUIC`                        | Connection handle.               |
+|                       | `Flags`      | `QUIC_STREAM_OPEN_FLAGS`       | UNIDIRECTIONAL or BIDIRECTIONAL. |
+|                       | `Handler`    | `QUIC_STREAM_CALLBACK_HANDLER` | Stream event callback.           |
+|                       | `Context`    | `void*`                        | User stream state pointer.       |
+|                       | `Stream`     | `HQUIC*`                       | OUT: new stream handle.          |
+| **MsQuicStreamStart** | `Stream`     | `HQUIC`                        | Stream handle.                   |
+|                       | `Flags`      | `QUIC_STREAM_START_FLAGS`      | NONE or ASYNC.                   |
+
+### Send, Receive, Shutdown, Close
+
+| API                              | Parameter       | Type                         | Description                           |
+| -------------------------------- | --------------- | ---------------------------- | ------------------------------------- |
+| **MsQuicStreamSend**             | `Stream`        | `HQUIC`                      | Stream handle.                        |
+|                                  | `Buffers`       | `const QUIC_BUFFER*`         | Pointer to data buffers.              |
+|                                  | `BufferCount`   | `uint32_t`                   | Number of buffers.                    |
+|                                  | `Flags`         | `QUIC_SEND_FLAGS`            | e.g. NONE, FIN.                       |
+|                                  | `ClientContext` | `void*`                      | Token passed back in `SEND_COMPLETE`. |
+| **QUIC\_STREAM\_EVENT\_RECEIVE** | *Callback*      | `QUIC_STREAM_EVENT`          | Delivers received data and flags.     |
+| **MsQuicStreamShutdown**         | `Stream`        | `HQUIC`                      | Stream handle.                        |
+|                                  | `Flags`         | `QUIC_STREAM_SHUTDOWN_FLAGS` | GRACEFUL or ABORT.                    |
+|                                  | `ErrorCode`     | `uint64_t`                   | Application error code or 0.          |
+| **MsQuicStreamClose**            | `Stream`        | `HQUIC`                      | Frees the handle (after shutdown).    |
+
+---

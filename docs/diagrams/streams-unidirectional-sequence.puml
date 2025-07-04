@@ -1,0 +1,21 @@
+﻿@startuml
+actor Application
+participant Connection as C
+participant Stream as S
+participant RemotePeer as R
+
+== Open Stream ==
+Application -> C : MsQuicStreamOpen(\n C,\n UNIDIRECTIONAL,\n StreamCallback,\n Ctx) → S
+Application -> S : MsQuicStreamStart(S, NONE)
+S -> S : OnEvent(START_COMPLETE)\n(status SUCCESS)
+
+== Send Data ==
+Application -> S : MsQuicStreamSend(S,\n Buffers, Count, FLAGS, &PacketContext)
+note right of S: Library applies flow-control\nto packet pacing
+S -> R : QUIC Stream Data
+
+== Shutdown & Close ==
+Application -> S : MsQuicStreamShutdown(S, GRACEFUL, 0)
+S -> S : OnEvent(SHUTDOWN_COMPLETE)
+Application -> S : MsQuicStreamClose(S)
+@enduml
