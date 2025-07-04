@@ -1,0 +1,21 @@
+@startuml
+actor Application
+participant Connection as C
+participant RemotePeer as S
+
+== Enable & Handshake ==
+Application -> C : ConfigurationOpen(...,Settings{DatagramReceiveEnabled=TRUE})
+C -> S : Initial+TLS (ADVERTISE_DATAGRAM)
+S -> C : Handshake Response
+C -> C : OnEvent(DATAGRAM_STATE_CHANGED)\n(Enabled=TRUE,MaxSize=1200)
+
+== Send Datagram ==
+Application -> C : MsQuicDatagramSend(\n Buffers,Count,Flags,ClientCtx)
+C -> C : OnEvent(DATAGRAM_SEND_STATE_CHANGED)\n(State=QUEUED/SENT/DROPPED)
+C -> S : UDP Datagram Frame
+
+== Receive Datagram ==
+S -> C : UDP Datagram Frame
+C -> C : OnEvent(DATAGRAM_RECEIVED)\n(Buffer,Length)
+C --> Application : QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED
+@enduml

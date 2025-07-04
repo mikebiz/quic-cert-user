@@ -590,9 +590,6 @@ Below is **Section 4: Streams**—covering both unidirectional and bidirectional
 
 **Bidirectional (Server⇄Client)**
 
-
-**Unidirectional (Client→Server)**
-
 ![Diagram](images/streams-bidirectional-sequence.png)
 
 [🔍 View SVG](svg/streams-bidirectional-sequence.svg)  
@@ -671,3 +668,84 @@ MsQuicConnectionGetParam(Connection,
 | **MsQuicStreamClose**            | `Stream`        | `HQUIC`                      | Frees the handle (after shutdown).    |
 
 ---
+
+# Section 5: Datagrams
+
+MsQuic supports the IETF QUIC unreliable datagram extension, allowing applications to exchange small, unordered, and un-retransmitted packets securely alongside streams.
+
+## 5.1 Overview & Use Cases
+
+| Feature                   | Description                                                        |
+| ------------------------- | ------------------------------------------------------------------ |
+| **Unreliable**            | Datagrams are not retransmitted on packet loss.                    |
+| **Unordered**             | Delivery ordering is not guaranteed.                               |
+| **Low Latency**           | Ideal for time-sensitive data (gaming state, VoIP RTP, telemetry). |
+| **Secure**                | Encrypted and authenticated under the same TLS session as streams. |
+| **Coexists with Streams** | Multiplexed on the same connection without head-of-line blocking.  |
+
+**Common Scenarios**
+
+* Real-time game state updates
+* VoIP or video chat RTP
+* Sensor telemetry where occasional loss is acceptable
+* Heartbeat or ping messages for liveness checks
+
+---
+
+## 5.2 Enabling Datagrams
+
+Before sending or receiving, you must negotiate support in the handshake:
+
+1. **Set in QUIC\_SETTINGS**
+
+   ```cpp
+   QUIC_SETTINGS Settings{};
+   Settings.IsSet.DatagramReceiveEnabled = TRUE;
+   Settings.DatagramReceiveEnabled = TRUE;
+   ```
+
+2. **ConfigurationOpen**
+   Pass `&Settings` into `MsQuicConfigurationOpen()` so the peer knows you want datagram support ([microsoft.github.io][1]).
+
+3. **Event: DATAGRAM\_STATE\_CHANGED**
+   The library fires `QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED` when negotiation completes, indicating:
+
+   * `Enabled` (peer supports)
+   * `MaxSendLength` (largest datagram you may send) ([microsoft.github.io][1]).
+
+---
+
+## 5.3 Datagram Lifecycle & Events
+
+| Step                   | API / Event                                         | Description                                      |
+| ---------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| **Send**               | `MsQuicDatagramSend(...)`                           | Queue a datagram for send (unreliable).          |
+| **Send State Changed** | `QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED` | Indicates datagram was queued, sent, or dropped. |
+| **Receive**            | `QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED`           | Application callback with buffer and length.     |
+
+---
+
+#### Sequence Diagram: Sending & Receiving Datagrams
+
+
+![Diagram](images/datagrams-sequence.png)
+
+[🔍 View SVG](svg/datagrams-sequence.svg)  
+[🧾 View Source (.puml)](diagrams/datagrams-sequence.puml)
+
+---
+
+### 5.4 API Parameter Reference
+
+| API/Event                                                   | Parameter                | Type                    | Description                                                                     |
+| ----------------------------------------------------------- | ------------------------ | ----------------------- | ------------------------------------------------------------------------------- |
+| **QUIC\_SETTINGS**                                          | `DatagramReceiveEnabled` | `BOOLEAN`               | Enable datagram receive in handshake.                                           |
+|                                                             | `DatagramSendEnabled`    | `BOOLEAN`               | (If available) Enable send support.                                             |
+| **MsQuicDatagramSend**                                      | `Buffers`                | `const QUIC_BUFFER*`    | Array of data buffers.                                                          |
+|                                                             | `BufferCount`            | `uint16_t`              | Number of buffers.                                                              |
+|                                                             | `Flags`                  | `QUIC_SEND_FLAGS`       | e.g. `NONE`.                                                                    |
+|                                                             | `ClientContext`          | `void*`                 | User pointer returned in send-state event.                                      |
+| **QUIC\_CONNECTION\_EVENT\_DATAGRAM\_STATE\_CHANGED**       | *Callback*               | `QUIC_CONNECTION_EVENT` | Notifies whether datagrams are enabled and max size. ([microsoft.github.io][1]) |
+| **QUIC\_CONNECTION\_EVENT\_DATAGRAM\_SEND\_STATE\_CHANGED** | *Callback*               | `QUIC_CONNECTION_EVENT` | Indicates per-datagram send state (queued, sent, dropped).                      |
+| **QUIC\_CONNECTION\_EVENT\_DATAGRAM\_RECEIVED**             | *Callback*               | `QUIC_CONNECTION_EVENT` | Delivers received datagram buffer and length. ([github.com][2])                 |
+
