@@ -406,6 +406,32 @@ A QUIC **listener** binds to a UDP port and dispatches incoming Initial packets 
 [🧾 View Source (.puml)](diagrams/listener-lifecycle-sequence.puml)
 
 ---
+### Listener API Parameter Reference
+
+| API                     | Parameter              | Type                              | Description                                                             |
+| ----------------------- | ---------------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| **MsQuicOpen2**         | `ClientVersion`        | `uint32_t`                        | Version constant (e.g. `MSQUIC_API_VERSION_2`).                         |
+|                         | `QuicLib`              | `const QUIC_TABLE**`              | OUT: pointer to MsQuic function table.                                  |
+| **RegistrationOpen**    | `RegConfig`            | `const QUIC_REGISTRATION_CONFIG*` | App identity (`AppName`, `ExecutionProfile`).                           |
+|                         | `Context`              | `void*`                           | User pointer for listener callbacks.                                    |
+|                         | `Registration`         | `HQUIC*`                          | OUT: registration handle.                                               |
+| **ConfigurationOpen**   | `Registration`         | `HQUIC`                           | Registration handle from `RegistrationOpen`.                            |
+|                         | `AlpnBuffers`          | `const QUIC_BUFFER*`              | ALPN identifiers array (e.g. `"h3"`).                                   |
+|                         | `AlpnBufferCount`      | `uint32_t`                        | Number of ALPN entries.                                                 |
+|                         | `Settings`             | `const QUIC_SETTINGS*`            | Transport/TLS settings.                                                 |
+|                         | `SettingsBufferLength` | `uint32_t`                        | Size of `QUIC_SETTINGS` in bytes.                                       |
+|                         | `Context`              | `void*`                           | Optional config-level context.                                          |
+|                         | `Configuration`        | `HQUIC*`                          | OUT: configuration handle.                                              |
+| **MsQuicListenerOpen**  | `Registration`         | `HQUIC`                           | Registration handle.                                                    |
+|                         | `Handler`              | `QUIC_LISTENER_CALLBACK_HANDLER`  | Listener’s event callback (`NEW_CONNECTION`, `LISTENER_STOPPED`, etc.). |
+|                         | `Context`              | `void*`                           | User pointer for listener state.                                        |
+|                         | `Listener`             | `HQUIC*`                          | OUT: listener handle.                                                   |
+| **MsQuicListenerStart** | `Listener`             | `HQUIC`                           | Handle from `MsQuicListenerOpen`.                                       |
+|                         | `LocalAddress`         | `const QUIC_ADDR*`                | IP/port to bind (e.g. `0.0.0.0:443`).                                   |
+| **MsQuicListenerStop**  | `Listener`             | `HQUIC`                           | Listener handle to stop.                                                |
+| **MsQuicListenerClose** | `Listener`             | `HQUIC`                           | Listener handle to free (no further callbacks).                         |
+
+---
 
 # Section 3: Server-Side Accept Callbacks
 
@@ -494,3 +520,24 @@ When a peer’s Initial packet arrives, the listener emits a **NEW\_CONNECTION**
 [🧾 View Source (.puml)](diagrams/server-accept-sequence.puml)
 
 ---
+### Server‐Side Accept Callback API Reference
+
+| API                                             | Parameter           | Type                               | Description                                                    |
+| ----------------------------------------------- | ------------------- | ---------------------------------- | -------------------------------------------------------------- |
+| **OnEvent(NEW\_CONNECTION)**                    | `Event->Connection` | `HQUIC`                            | Handle for the new incoming connection.                        |
+| **MsQuicSetCallbackHandler**                    | `Connection`        | `HQUIC`                            | Connection handle from `NEW_CONNECTION`.                       |
+|                                                 | `Handler`           | `QUIC_CONNECTION_CALLBACK_HANDLER` | Your per-connection event callback.                            |
+|                                                 | `Context`           | `void*`                            | User pointer for connection state.                             |
+| **MsQuicConnectionSetParam**                    | `Connection`        | `HQUIC`                            | Connection handle.                                             |
+|                                                 | `Param`             | `QUIC_PARAM_CONN`                  | Parameter ID (e.g. `QUIC_PARAM_CONN_LOCAL_CID_PREFIX`).        |
+|                                                 | `BufferLength`      | `uint32_t`                         | Size of the parameter data.                                    |
+|                                                 | `Buffer`            | `const void*`                      | Parameter data pointer.                                        |
+| **MsQuicConnectionShutdown**                    | `Connection`        | `HQUIC`                            | Connection handle.                                             |
+|                                                 | `Flags`             | `QUIC_CONNECTION_SHUTDOWN_FLAGS`   | e.g. `0` for graceful, `QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT`. |
+|                                                 | `ErrorCode`         | `uint64_t`                         | 0 (success) or application/error status.                       |
+| **QUIC\_CONNECTION\_EVENT\_CONNECTED**          | *Callback*          | `QUIC_CONNECTION_EVENT`            | Fired when handshake completes successfully.                   |
+| **MsQuicConnectionClose**                       | `Connection`        | `HQUIC`                            | Connection handle; call after `SHUTDOWN_COMPLETE`.             |
+| **QUIC\_CONNECTION\_EVENT\_SHUTDOWN\_COMPLETE** | *Callback*          | `QUIC_CONNECTION_EVENT`            | Fired after shutdown sequence finishes.                        |
+
+---
+
