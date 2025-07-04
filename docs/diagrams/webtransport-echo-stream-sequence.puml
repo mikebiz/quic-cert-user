@@ -1,0 +1,63 @@
+@startuml
+actor User
+participant ClientApp as Client
+participant MsQuicClient as "MsQuic (Client)"
+participant ServerApp as Server
+participant MsQuicServer as "MsQuic (Server)"
+
+== Initialization ==
+
+User -> Client : Launch client
+Client -> MsQuicClient : MsQuicOpen2()
+Client -> MsQuicClient : RegistrationOpen()
+Client -> MsQuicClient : ConfigurationOpen()
+Client -> MsQuicClient : ConfigurationLoadCredential()
+Client -> MsQuicClient : ConnectionOpen()
+Client -> MsQuicClient : ConnectionStart("quic.bmobile.biz", 4443)
+
+== TLS + ALPN Handshake ==
+
+MsQuicClient -> MsQuicServer : Initiate QUIC handshake
+MsQuicServer -> Server : QUIC_CONNECTION_EVENT_CONNECTED
+
+== Control Stream Setup (Server) ==
+
+Server -> MsQuicServer : StreamOpen (unidirectional)
+Server -> MsQuicServer : StreamStart
+Server -> MsQuicServer : StreamSend [SETTINGS_ENABLE_WEBTRANSPORT]
+
+== WebTransport CONNECT Request (Client) ==
+
+Client -> MsQuicClient : StreamOpen (bidi)
+Client -> MsQuicClient : StreamStart
+Client -> MsQuicClient : StreamSend [:method: CONNECT + :protocol: webtransport]
+
+MsQuicClient -> MsQuicServer : Send CONNECT request
+MsQuicServer -> Server : QUIC_STREAM_EVENT_RECEIVE [:method: CONNECT...]
+
+Server -> Server : Route to Http3Handler
+Server -> Server : EmitSettingsControlStream()
+
+== Echo Stream (Bidirectional) ==
+
+User -> Client : Enter text to echo
+Client -> MsQuicClient : StreamOpen (bidi)
+Client -> MsQuicClient : StreamStart
+Client -> MsQuicClient : StreamSend(userInput)
+
+MsQuicClient -> MsQuicServer : Transmit echo text
+MsQuicServer -> Server : QUIC_STREAM_EVENT_RECEIVE
+Server -> Server : Route to EchoHandler
+Server -> MsQuicServer : StreamSend("Echo: <userInput>")
+
+MsQuicServer -> MsQuicClient : Stream RECEIVE (Echo: ...)
+Client -> Client : Display echoed text
+
+== Shutdown ==
+
+User -> Client : Press Enter to exit
+Client -> MsQuicClient : ConnectionClose()
+MsQuicClient -> MsQuicServer : QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+MsQuicServer -> Server : QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+
+@enduml
