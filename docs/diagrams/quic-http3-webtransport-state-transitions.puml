@@ -1,0 +1,97 @@
+@startuml
+!theme plain
+skinparam state {
+  BackgroundColor lightblue
+  BorderColor black
+  ArrowColor black
+}
+
+title QUIC/HTTP3/WebTransport State Transitions
+
+state "QUIC Connection States" as QUICConn {
+  state IDLE : Entry state
+  state CONNECTING : Handshake in progress
+  state CONNECTED : Ready for streams/datagrams
+  state DRAINING : Shutdown initiated
+  state CLOSED : Connection terminated
+  state ERROR : Error occurred
+
+  [*] --> IDLE : ConnectionOpen()
+  IDLE --> CONNECTING : ConnectionStart()\n[Client]
+  IDLE --> CONNECTING : NEW_CONNECTION\n[Server]
+  CONNECTING --> CONNECTED : CONNECTION_CONNECTED\n(TLS handshake complete)
+  CONNECTING --> ERROR : Handshake failure\nTimeout
+  CONNECTED --> DRAINING : ConnectionShutdown()\nPeer shutdown
+  CONNECTED --> ERROR : Protocol error\nTransport error
+  DRAINING --> CLOSED : SHUTDOWN_COMPLETE
+  ERROR --> CLOSED : Cleanup complete
+  CLOSED --> [*] : ConnectionClose()
+}
+
+state "QUIC Stream States" as QUICStream {
+  state STREAM_IDLE : Stream created
+  state STREAM_OPEN : Active bidirectional
+  state HALF_CLOSED_LOCAL : Local send closed
+  state HALF_CLOSED_REMOTE : Remote send closed
+  state STREAM_CLOSED : Stream terminated
+  state STREAM_ERROR : Stream error
+
+  [*] --> STREAM_IDLE : StreamOpen()
+  STREAM_IDLE --> STREAM_OPEN : StreamStart()\nPEER_STREAM_STARTED
+  STREAM_OPEN --> HALF_CLOSED_LOCAL : StreamShutdown(SEND)\nSend FIN
+  STREAM_OPEN --> HALF_CLOSED_REMOTE : PEER_SEND_SHUTDOWN\nReceive FIN
+  HALF_CLOSED_LOCAL --> STREAM_CLOSED : PEER_SEND_SHUTDOWN
+  HALF_CLOSED_REMOTE --> STREAM_CLOSED : StreamShutdown(SEND)
+  STREAM_OPEN --> STREAM_ERROR : Stream reset\nProtocol error
+  HALF_CLOSED_LOCAL --> STREAM_ERROR : Stream reset
+  HALF_CLOSED_REMOTE --> STREAM_ERROR : Stream reset
+  STREAM_ERROR --> STREAM_CLOSED : Error handled
+  STREAM_CLOSED --> [*] : StreamClose()
+}
+
+state "HTTP/3 Layer States" as HTTP3 {
+  state H3_INIT : HTTP/3 not initialized
+  state H3_SETTINGS_PENDING : Waiting for SETTINGS
+  state H3_READY : Ready for requests
+  state H3_ERROR : HTTP/3 error
+
+  [*] --> H3_INIT : Connection established
+  H3_INIT --> H3_SETTINGS_PENDING : Control stream created
+  H3_SETTINGS_PENDING --> H3_READY : SETTINGS exchanged
+  H3_SETTINGS_PENDING --> H3_ERROR : Invalid SETTINGS\nTimeout
+  H3_READY --> H3_ERROR : Protocol violation
+  H3_ERROR --> [*] : Connection closed
+}
+
+state "WebTransport Session States" as WebTransport {
+  state WT_INITIALIZING : Session created
+  state WT_CONNECTING : CONNECT sent
+  state WT_CONNECTED : Session established
+  state WT_CLOSING : Shutdown initiated
+  state WT_CLOSED : Session terminated
+  state WT_FAILED : Connection failed
+
+  [*] --> WT_INITIALIZING : Session created
+  WT_INITIALIZING --> WT_CONNECTING : Send CONNECT\n[Client]
+  WT_INITIALIZING --> WT_CONNECTING : Receive CONNECT\n[Server]
+  WT_CONNECTING --> WT_CONNECTED : HTTP/3 200 OK\n[Client]\nSend 200 OK\n[Server]
+  WT_CONNECTING --> WT_FAILED : HTTP/3 4xx/5xx\nValidation failure
+  WT_CONNECTED --> WT_CLOSING : Session shutdown\nConnection closing
+  WT_CLOSING --> WT_CLOSED : Cleanup complete
+  WT_FAILED --> WT_CLOSED : Error handled
+  WT_CLOSED --> [*] : Session destroyed
+}
+
+' State relationships and triggers
+note right of CONNECTING : Triggers:\n- TLS handshake\n- Transport parameter exchange\n- Version negotiation
+note right of CONNECTED : Triggers:\n- Create streams\n- Send datagrams\n- Process peer streams
+note right of H3_READY : Triggers:\n- HEADERS frames\n- DATA frames\n- WebTransport CONNECT
+note right of WT_CONNECTED : Triggers:\n- Create WT streams\n- Send WT datagrams\n- Application data
+
+' Cross-layer dependencies
+QUICConn --> HTTP3 : CONNECTED enables H3
+HTTP3 --> WebTransport : H3_READY enables WT
+QUICStream --> HTTP3 : Stream data carries H3 frames
+HTTP3 --> WebTransport : CONNECT request/response
+
+@enduml

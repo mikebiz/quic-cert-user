@@ -1,5 +1,10 @@
 ﻿# Updated: Generate-Diagrams.ps1
 
+#Execution:
+#Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+#.\generate-diagrams.ps1
+
+
 $ErrorActionPreference = "Stop"
 
 $basePath = "$PSScriptRoot/docs"

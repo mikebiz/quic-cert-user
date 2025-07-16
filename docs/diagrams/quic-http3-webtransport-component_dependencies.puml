@@ -1,0 +1,105 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightblue
+  BorderColor black
+}
+
+title QUIC/HTTP3/WebTransport Component Dependencies
+
+package "Application Layer" {
+  component "WebTransport Application" as WTApp
+  component "HTTP/3 Application"      as H3App
+}
+
+package "WebTransport Protocol" {
+  component "WebTransport Session"   as WTSession
+  component "WebTransport Streams"   as WTStreams
+  component "WebTransport Datagrams" as WTDatagrams
+
+  WTSession --> WTStreams   : manages
+  WTSession --> WTDatagrams : manages
+}
+
+package "HTTP/3 Protocol" {
+  component "HTTP/3 Frame Parser"    as H3Parser
+  component "QPACK Encoder/Decoder"  as QPACK
+  component "HTTP/3 Control Stream"  as H3Control
+  component "HTTP/3 Request Stream"  as H3Request
+  component "SETTINGS Frame"         as H3Settings
+  component "HEADERS Frame"          as H3Headers
+  component "DATA Frame"             as H3Data
+
+  H3Parser   --> QPACK       : uses
+  H3Control  --> H3Settings  : sends/receives
+  H3Request  --> H3Headers   : sends/receives
+  H3Request  --> H3Data      : sends/receives
+}
+
+package "MsQuic Layer" {
+  component "Registration"   as Reg
+  component "Configuration"  as Config
+  component "Listener"       as Listener
+  component "Connection"     as Conn
+  component "Stream"         as Stream
+  component "Datagram"       as Datagram
+  component "TLS Context"    as TLS
+
+  Reg       --> Config    : creates
+  Reg       --> Listener  : creates
+  Reg       --> Conn      : creates
+  Config    --> Conn      : configures
+  Listener  --> Conn      : accepts
+  Conn      --> Stream    : creates
+  Conn      --> Datagram  : manages
+  Conn      --> TLS       : manages
+}
+
+package "Transport Layer" {
+  component "UDP Socket"        as UDP
+  component "Network Interface" as NetIf
+
+  UDP --> NetIf : uses
+}
+
+' Application to Protocol mappings
+WTApp  --> WTSession : uses
+H3App  --> H3Parser  : uses
+
+' WebTransport to HTTP/3 mappings
+WTSession  --> H3Request : CONNECT request
+WTStreams  --> Stream    : maps to
+WTDatagrams--> Datagram  : maps to
+
+' HTTP/3 to QUIC mappings
+H3Control  --> Stream : unidirectional
+H3Request  --> Stream : bidirectional
+H3Headers  --> Stream : frame data
+H3Data     --> Stream : frame data
+H3Settings --> Stream : frame data
+
+' QUIC to Transport mappings
+Conn     --> UDP : sends/receives
+Datagram --> UDP : sends/receives
+Stream   --> UDP : sends/receives (via connection)
+
+' Dependency annotations
+note right of WTSession : Requires HTTP/3 200 OK\nto CONNECT request
+note right of H3Control  : Stream ID 2/3\n(client/server initiated)
+note right of H3Request  : Stream ID 0, 4, 8...\n(bidirectional)
+note right of Stream     : Reliable, ordered\ndelivery
+note right of Datagram   : Unreliable,\nunordered delivery
+
+' Protocol layer annotations
+note top of WTSession : RFC 9220\nWebTransport over HTTP/3
+note top of H3Parser  : RFC 9114\nHTTP/3
+note top of Conn      : RFC 9000\nQUIC Transport
+note top of TLS       : RFC 8446\nTLS 1.3
+
+' State dependencies
+note left of Config   : Must load credentials\nbefore connection use
+note left of Listener : Must set configuration\nfor accepted connections
+note left of Stream   : Must set callback\nand enable receive
+@enduml

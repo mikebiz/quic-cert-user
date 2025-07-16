@@ -1,0 +1,206 @@
+﻿@startuml
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title WebTransport over QUIC/HTTP3 - Complete Sequence
+
+actor "Client App"                       as ClientApp
+participant "Client\nController"          as ClientCtrl
+participant "QUIC\nConnection\n(Client)"  as ClientConn
+participant "Client\nStreams"             as ClientStream
+participant "Network"                     as Net
+participant "Server\nListener"            as ServerList
+participant "QUIC\nConnection\n(Server)"  as ServerConn
+participant "Server\nStreams"             as ServerStream
+participant "Server\nController"          as ServerCtrl
+actor   "Server App"                     as ServerApp
+
+== Initialization Phase ==
+ClientApp -> ClientCtrl : Initialize()
+activate ClientCtrl
+ClientCtrl -> ClientCtrl : MsQuicOpen(), RegistrationOpen()
+ClientCtrl -> ClientCtrl : ConfigurationOpen(), LoadCredentials()
+note right of ClientCtrl : Client: CREDENTIAL_TYPE_NONE\nFlags: CLIENT | NO_CERT_VALIDATION
+ClientApp <-- ClientCtrl : (returns)
+
+ServerApp -> ServerCtrl : Initialize()
+activate ServerCtrl
+ServerCtrl -> ServerCtrl : MsQuicOpen(), RegistrationOpen()
+ServerCtrl -> ServerCtrl : ConfigurationOpen(), LoadCredentials()
+note left of ServerCtrl : Server: CERTIFICATE_HASH_STORE\nFlags: None (server cert required)
+ServerApp <-- ServerCtrl : (returns)
+
+ServerCtrl -> ServerList : ListenerOpen()
+activate ServerList
+ServerList -> ServerList : ListenerStart(port=4443, ALPN="h3")
+ServerList -> ServerApp : Ready for connections
+deactivate ServerList
+deactivate ServerCtrl
+
+== QUIC Connection Establishment ==
+ClientApp -> ClientCtrl : CreateWebTransportClient()
+ClientCtrl -> ClientConn : ConnectionOpen()
+activate ClientConn
+ClientConn -> ClientConn : State: IDLE → CONNECTING
+ClientConn -> Net        : ConnectionStart("server", 4443)
+
+Net           -> ServerList : Incoming connection
+activate ServerList
+ServerList    -> ServerList : LISTENER_EVENT_NEW_CONNECTION
+ServerList    -> ServerConn : Create connection object
+activate ServerConn
+ServerList    -> ServerConn : SetCallbackHandler()
+ServerList    -> ServerConn : ConnectionSetConfiguration()
+deactivate ServerList
+
+Net           -> Net        : QUIC Handshake + TLS 1.3
+note over Net               : - Version negotiation\n- Crypto handshake\n- Transport parameters\n- Certificate validation
+
+Net           -> ClientConn : CONNECTION_EVENT_CONNECTED
+ClientConn    -> ClientConn : State: CONNECTING → CONNECTED
+ClientConn    -> ClientCtrl : Connection established
+deactivate ClientConn
+
+Net           -> ServerConn : CONNECTION_EVENT_CONNECTED
+ServerConn    -> ServerConn : State: IDLE → CONNECTED
+ServerConn    -> ServerCtrl : Connection established
+deactivate ServerConn
+
+== HTTP/3 Settings Exchange ==
+note over ClientConn,ServerConn : Optional: HTTP/3 SETTINGS frames\n(can be sent on control streams)
+
+ClientConn    -> ClientStream : Create control stream (ID=2, UNI)
+activate ClientStream
+ClientStream  -> ClientStream : Send: Stream Type (0x00)
+ClientStream  -> ClientStream : Send: SETTINGS frame
+ClientStream  -> Net        : SETTINGS(ENABLE_WEBTRANSPORT=1)
+
+Net           -> ServerConn : PEER_STREAM_STARTED (ID=2, UNI)
+activate ServerStream
+ServerConn    -> ServerStream : Create stream object
+ServerConn    -> ServerStream : SetCallbackHandler()
+Net           -> ServerStream : STREAM_EVENT_RECEIVE
+ServerStream  -> ServerStream : Process: Control stream + SETTINGS
+ServerStream  -> ServerCtrl   : Settings received: WEBTRANSPORT enabled
+deactivate ServerStream
+deactivate ClientStream
+
+== WebTransport CONNECT Request ==
+ClientCtrl    -> ClientConn : Create bidirectional stream (ID=0)
+activate ClientStream
+ClientConn    -> ClientStream : StreamOpen(BIDIRECTIONAL)
+ClientStream  -> ClientStream : StreamStart()
+ClientCtrl    -> ClientStream : Send WebTransport CONNECT
+ClientStream  -> ClientStream : Build HEADERS frame:
+note right of ClientStream    : QPACK encoded:\n:method: CONNECT\n:protocol: webtransport\n:scheme: https\n:authority: server:4443\n:path: /webtransport
+ClientStream  -> Net        : HTTP/3 HEADERS frame
+
+Net           -> ServerConn : PEER_STREAM_STARTED (ID=0, BIDI)
+activate ServerStream
+ServerConn    -> ServerStream : Create stream object
+ServerConn    -> ServerStream : SetCallbackHandler()
+ServerConn    -> ServerStream : StreamReceiveSetEnabled(TRUE)
+Net           -> ServerStream : STREAM_EVENT_RECEIVE
+ServerStream  -> ServerStream : Parse HTTP/3 HEADERS frame
+ServerStream  -> ServerStream : Decode QPACK headers
+ServerStream  -> ServerStream : Validate WebTransport CONNECT:
+note left of ServerStream     : Validate:\n- :method = CONNECT\n- :protocol = webtransport\n- :scheme = https\n- :authority present\n- :path present
+
+== WebTransport Session Establishment ==
+alt Valid WebTransport CONNECT
+    ServerStream -> ServerStream : Create WebTransport session
+    ServerStream -> ServerStream : State: INITIALIZING → CONNECTING
+    ServerStream -> ServerStream : Build HTTP/3 200 OK response
+    ServerStream -> Net        : HTTP/3 HEADERS(:status=200)
+
+    activate ClientStream
+    Net           -> ClientStream : STREAM_EVENT_RECEIVE
+    ClientStream  -> ClientStream : Parse HTTP/3 response
+    ClientStream  -> ClientStream : Detect :status=200
+    ClientStream  -> ClientCtrl   : WebTransport CONNECT accepted
+    ClientCtrl    -> ClientCtrl   : Session state: CONNECTING → CONNECTED
+    deactivate ClientStream
+
+    ServerStream  -> ServerStream : Session state: CONNECTING → CONNECTED
+    ServerStream  -> ServerCtrl   : WebTransport session established
+
+else Invalid CONNECT
+    ServerStream -> Net        : HTTP/3 HEADERS(:status=400)
+    Net           -> ClientStream : STREAM_EVENT_RECEIVE
+    ClientStream  -> ClientCtrl   : WebTransport CONNECT rejected
+    ClientCtrl    -> ClientCtrl   : Session state: CONNECTING → FAILED
+end
+
+deactivate ServerStream
+deactivate ClientStream
+
+== WebTransport Data Exchange ==
+note over ClientCtrl,ServerCtrl : WebTransport session is now established\nReady for bidirectional streams and datagrams
+
+loop Data Communication
+    ClientApp   -> ClientCtrl  : Create WebTransport stream
+    ClientCtrl  -> ClientConn  : StreamOpen(BIDIRECTIONAL)
+    ClientConn  -> ClientStream : New stream (ID=4)
+    activate ClientStream
+
+    ClientApp   -> ClientStream : Send application data
+    ClientStream -> Net         : Stream data
+
+    Net         -> ServerConn   : PEER_STREAM_STARTED (ID=4)
+    activate ServerStream
+    ServerConn  -> ServerStream : Create WebTransport stream
+    Net         -> ServerStream : STREAM_EVENT_RECEIVE
+    ServerStream -> ServerApp   : Application data received
+
+    ServerApp   -> ServerStream : Send response data
+    ServerStream -> Net         : Stream data
+    Net         -> ClientStream : STREAM_EVENT_RECEIVE
+    ClientStream -> ClientApp   : Response data received
+
+    deactivate ServerStream
+    deactivate ClientStream
+end
+
+opt Datagram Communication
+    ClientApp   -> ClientConn : Send datagram
+    ClientConn  -> Net        : QUIC datagram
+    Net         -> ServerConn : CONNECTION_EVENT_DATAGRAM_RECEIVED
+    ServerConn  -> ServerApp  : Datagram received
+
+    ServerApp   -> ServerConn : Send response datagram
+    ServerConn  -> Net        : QUIC datagram
+    Net         -> ClientConn : CONNECTION_EVENT_DATAGRAM_RECEIVED
+    ClientConn  -> ClientApp  : Response datagram received
+end
+
+== Graceful Shutdown ==
+ClientApp   -> ClientCtrl : Shutdown
+activate ClientStream
+ClientCtrl  -> ClientStream : StreamShutdown(GRACEFUL)
+ClientStream -> ClientStream : Send FIN
+ClientStream -> Net         : Stream FIN
+Net         -> ServerStream : PEER_SEND_SHUTDOWN
+ServerStream -> ServerStream : Process peer FIN
+deactivate ClientStream
+
+ClientCtrl  -> ClientConn : ConnectionShutdown()
+activate ClientConn
+ClientConn  -> ClientConn : State: CONNECTED → DRAINING
+ClientConn  -> Net        : CONNECTION_CLOSE frame
+
+Net         -> ServerConn   : Connection close received
+activate ServerConn
+ServerConn  -> ServerConn   : State: CONNECTED → DRAINING
+ServerConn  -> ServerConn   : CONNECTION_EVENT_SHUTDOWN_COMPLETE
+ServerConn  -> ServerConn   : State: DRAINING → CLOSED
+deactivate ServerConn
+
+ClientConn  -> ClientConn   : CONNECTION_EVENT_SHUTDOWN_COMPLETE
+ClientConn  -> ClientConn   : State: DRAINING → CLOSED
+deactivate ClientConn
+
+ServerCtrl  -> ServerList   : Close listener
+deactivate ServerList
+deactivate ServerCtrl
+@enduml

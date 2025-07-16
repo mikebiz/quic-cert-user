@@ -1,0 +1,159 @@
+﻿@startuml
+!theme plain
+skinparam component {
+  BackgroundColor lightblue
+  BorderColor black
+}
+
+title WebTransport Protocol Stack and Message Flow
+
+package "Client" {
+  component [WebTransport Client] as WTClient
+  component [HTTP/3 Client] as H3Client  
+  component [QUIC Client] as QClient
+  component [UDP Client] as UClient
+}
+
+package "Server" {
+  component [WebTransport Server] as WTServer
+  component [HTTP/3 Server] as H3Server
+  component [QUIC Server] as QServer  
+  component [UDP Server] as UServer
+}
+
+package "Network" {
+  cloud [Internet] as Net
+}
+
+' Vertical protocol stack
+WTClient --> H3Client : WebTransport API
+H3Client --> QClient : HTTP/3 Frames
+QClient --> UClient : QUIC Packets
+UClient --> Net : UDP Datagrams
+
+Net --> UServer : UDP Datagrams
+UServer --> QServer : QUIC Packets
+QServer --> H3Server : HTTP/3 Frames
+H3Server --> WTServer : WebTransport API
+
+' Message flow details
+note right of WTClient : **WebTransport Operations**\n- createBidirectionalStream()\n- createUnidirectionalStream()\n- sendDatagram()\n- close()
+
+note right of H3Client : **HTTP/3 Frames**\n- HEADERS (CONNECT)\n- DATA\n- SETTINGS\n- Control stream management
+
+note right of QClient : **QUIC Features**\n- Stream multiplexing\n- Flow control\n- Reliable delivery\n- 0-RTT data
+
+note left of WTServer : **WebTransport Operations**\n- acceptBidirectionalStream()\n- acceptUnidirectionalStream()\n- receiveDatagram()\n- close()
+
+note left of H3Server : **HTTP/3 Processing**\n- Parse CONNECT request\n- Send 200 OK response\n- Frame demultiplexing\n- Error handling
+
+note left of QServer : **QUIC Processing**\n- Connection management\n- Stream lifecycle\n- Congestion control\n- Loss recovery
+
+' Protocol message examples
+package "Message Examples" {
+  
+  rectangle "1. WebTransport CONNECT" {
+    note as ConnectReq
+      **Client → Server**
+      
+      HEADERS Frame:
+      :method: CONNECT
+      :protocol: webtransport  
+      :scheme: https
+      :authority: example.com:443
+      :path: /chat
+    end note
+  }
+  
+  rectangle "2. WebTransport Response" {
+    note as ConnectResp
+      **Server → Client**
+      
+      HEADERS Frame:
+      :status: 200
+      
+      (WebTransport session established)
+    end note
+  }
+  
+  rectangle "3. WebTransport Stream" {
+    note as StreamData
+      **Bidirectional Stream**
+      
+      Client: "Hello WebTransport!"
+      Server: "Welcome to chat!"
+      
+      (Reliable, ordered delivery)
+    end note
+  }
+  
+  rectangle "4. WebTransport Datagram" {
+    note as DatagramMsg
+      **QUIC Datagram**
+      
+      Client: { "type": "ping", "timestamp": 123456 }
+      Server: { "type": "pong", "timestamp": 123456 }
+      
+      (Unreliable, unordered delivery)
+    end note
+  }
+}
+
+' Stream ID allocation
+rectangle "Stream ID Allocation" {
+  note as StreamIDs
+    **QUIC Stream IDs**
+    
+    Client-initiated:
+    - Bidirectional: 0, 4, 8, 12, ...
+    - Unidirectional: 2, 6, 10, 14, ...
+    
+    Server-initiated:  
+    - Bidirectional: 1, 5, 9, 13, ...
+    - Unidirectional: 3, 7, 11, 15, ...
+    
+    **HTTP/3 Usage**
+    - Control streams: ID 2, 3
+    - Request streams: ID 0 (CONNECT)
+    - WebTransport streams: ID 4+
+  end note
+}
+
+' Error scenarios
+rectangle "Error Handling" {
+  note as Errors
+    **Common Error Scenarios**
+    
+    1. CONNECT rejected (4xx response)
+       → WebTransport session fails
+    
+    2. Stream reset by peer
+       → Close stream, continue session
+    
+    3. Connection error
+       → All streams/datagrams fail
+    
+    4. Invalid frame
+       → HTTP/3 connection error
+    
+    5. Flow control violation
+       → Stream or connection error
+  end note
+}
+
+' Performance considerations
+rectangle "Performance Features" {
+  note as Performance
+    **Performance Optimizations**
+    
+    - 0-RTT connection establishment
+    - Stream prioritization
+    - Congestion control (BBR/Cubic)
+    - Connection migration
+    - Amplification attack protection
+    - ECN (Explicit Congestion Notification)
+    - Multiple packet number spaces
+  end note
+}
+
+@enduml

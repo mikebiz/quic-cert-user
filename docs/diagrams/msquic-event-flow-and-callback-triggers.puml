@@ -1,0 +1,179 @@
+﻿@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightblue
+  BorderColor black
+  ArrowColor black
+}
+
+title MsQuic Event Flow and Callback Triggers
+
+|Application Layer|
+start
+:Application calls MsQuic API;
+
+|MsQuic Core|
+:Process API call;
+:Update internal state;
+
+if (Event needs to be delivered?) then (yes)
+  :Queue callback event;
+
+  |Callback Processing|
+  :Invoke callback function;
+
+  if (Callback type?) then (Listener)
+    :LISTENER_CALLBACK;
+    split
+      :NEW_CONNECTION\n- Client connecting\n- Create connection object\n- Set callbacks;
+    split again
+      :STOP_COMPLETE\n- Listener stopped\n- Cleanup notification;
+    end split
+
+  elseif (Connection)
+    :CONNECTION_CALLBACK;
+    split
+      :CONNECTED\n- Handshake complete\n- Ready for streams\n- Setup application state;
+    split again
+      :PEER_STREAM_STARTED\n- Remote opened stream\n- Set stream callbacks\n- Enable receive if needed;
+    split again
+      :DATAGRAM_RECEIVED\n- Unreliable message\n- Process application data;
+    split again
+      :SHUTDOWN_INITIATED_BY_TRANSPORT\n- Protocol error\n- Handle error condition;
+    split again
+      :SHUTDOWN_INITIATED_BY_PEER\n- Graceful shutdown\n- Cleanup application state;
+    split again
+      :SHUTDOWN_COMPLETE\n- Connection closed\n- Free resources;
+    split again
+      :LOCAL_ADDRESS_CHANGED\n- Interface change\n- Update routing;
+    split again
+      :PEER_ADDRESS_CHANGED\n- Connection migration\n- Validate new path;
+    split again
+      :STREAMS_AVAILABLE\n- Flow control update\n- Create more streams;
+    split again
+      :DATAGRAM_STATE_CHANGED\n- Send capability changed\n- Adjust sending strategy;
+    split again
+      :RESUMPTION_TICKET_RECEIVED\n- TLS session ticket\n- Store for future use;
+    end split
+
+  else (Stream)
+    :STREAM_CALLBACK;
+    split
+      :START_COMPLETE\n- Stream ready\n- Begin data transfer;
+    split again
+      :RECEIVE\n- Data from peer\n- Process application data\n- Call StreamReceiveComplete();
+    split again
+      :SEND_COMPLETE\n- Send operation done\n- Continue sending if needed;
+    split again
+      :PEER_SEND_SHUTDOWN\n- Peer sent FIN\n- Handle end of data;
+    split again
+      :PEER_SEND_ABORTED\n- Peer reset stream\n- Handle error condition;
+    split again
+      :PEER_RECEIVE_ABORTED\n- Peer won't receive\n- Stop sending data;
+    split again
+      :SEND_SHUTDOWN_COMPLETE\n- Local FIN sent\n- Half-closed state;
+    split again
+      :SHUTDOWN_COMPLETE\n- Stream fully closed\n- Call StreamClose();
+    split again
+      :IDEAL_SEND_BUFFER_SIZE\n- Flow control hint\n- Adjust buffer size;
+    split again
+      :PEER_ACCEPTED\n- Stream accepted\n- Stream fully established;
+    end split
+  endif
+
+  |Application Layer|
+  if (Callback return value?) then (SUCCESS)
+    :Continue normal operation;
+  else (ERROR)
+    :Handle error\nCleanup if needed;
+  endif
+
+else (no)
+  :Continue processing;
+endif
+
+|Event Triggers|
+note right
+  **Network Events**  
+  - Packet received  
+  - Packet lost  
+  - Connection timeout  
+  - Address change
+end note
+
+note right
+  **API Calls**  
+  - ConnectionStart()  
+  - StreamOpen()  
+  - StreamSend()  
+  - StreamShutdown()
+end note
+
+note right
+  **Peer Actions**  
+  - Stream creation  
+  - Data transmission  
+  - Connection close  
+  - Reset frames
+end note
+
+note right
+  **Timer Events**  
+  - Idle timeout  
+  - Retransmission  
+  - Keep‑alive  
+  - Handshake timeout
+end note
+
+note right
+  **Flow Control**  
+  - Window updates  
+  - Stream limits  
+  - Connection limits  
+  - Blocked conditions
+end note
+
+note right
+  **TLS Events**  
+  - Handshake progress  
+  - Key updates  
+  - Certificate validation  
+  - Session tickets
+end note
+
+|State Dependencies|
+partition "Required State Transitions" {
+  :Registration OPEN\nbefore any other objects;
+  :Configuration LOAD_CREDENTIAL\nbefore connection use;
+  :Listener START\nbefore accepting connections;
+  :Connection CONNECTED\nbefore creating streams;
+  :Stream callback SET\nbefore receiving data;
+}
+
+partition "Cleanup Dependencies" {
+  :All streams CLOSED\nbefore connection close;
+  :All connections CLOSED\nbefore listener close;
+  :Listener CLOSED\nbefore configuration close;
+  :Configuration CLOSED\nbefore registration close;
+}
+
+|Error Handling|
+if (Error occurred?) then (yes)
+  split
+    :Connection error\n→ SHUTDOWN_INITIATED_BY_TRANSPORT;
+  split again
+    :Stream error\n→ PEER_SEND/RECEIVE_ABORTED;
+  split again
+    :TLS error\n→ Connection shutdown;
+  split again
+    :Protocol error\n→ Connection close;
+  end split
+
+  :Application handles error;
+  :Cleanup resources;
+else (no)
+  :Normal operation continues;
+endif
+
+stop
+@enduml
