@@ -23,3 +23,50 @@ Desktop.ini
 *.ps1xml
 *.pssc
 *.psd1
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.userprefs
+
+# Build artifacts
+*.exe
+*.dll
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.obj
+*.pch
+*.tlog
+*.log
+*.manifest
+*.res
+*.cache
+*.lastbuildstate
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Visual Studio cache/options
+.vscode/
+*.VC.db
+*.VC.opendb
