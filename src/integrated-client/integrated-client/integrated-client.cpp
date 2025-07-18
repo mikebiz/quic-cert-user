@@ -423,7 +423,6 @@ static void SendWebTransportConnect(HQUIC connection, const std::string& host, c
         return;
     }
 
-    // Add this debugging:
     std::cout << "[Client] Connect stream started successfully\n";
 
     // Add a small delay to ensure stream is ready
@@ -433,7 +432,6 @@ static void SendWebTransportConnect(HQUIC connection, const std::string& host, c
     headersBuf.Buffer = headersFrame.data();
     headersBuf.Length = static_cast<uint32_t>(headersFrame.size());
 
-    // Add this debugging:
     std::cout << "[Client] About to send QUIC buffer (" << headersBuf.Length << " bytes): ";
     maxPrint = (headersBuf.Length < 32) ? headersBuf.Length : 32;
     for (size_t i = 0; i < maxPrint; ++i) {
@@ -444,7 +442,6 @@ static void SendWebTransportConnect(HQUIC connection, const std::string& host, c
     }
     std::cout << "\n";
 
-    // Right before MsQuic->StreamSend in SendWebTransportConnect
     std::cout << "[Client] About to send buffer verification:\n";
     std::cout << "[Client] Buffer pointer: " << (void*)headersBuf.Buffer << "\n";
     std::cout << "[Client] Buffer length: " << headersBuf.Length << "\n";
