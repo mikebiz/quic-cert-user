@@ -1,0 +1,81 @@
+﻿@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title QUIC Connection Establishment Phase
+
+actor "Client App" as ClientApp
+participant "Client\nController" as ClientCtrl
+participant "QUIC\nConnection\n(Client)" as ClientConn
+participant "Network" as Net
+participant "Server\nListener" as ServerList
+participant "QUIC\nConnection\n(Server)" as ServerConn
+participant "Server\nController" as ServerCtrl
+
+== Connection Initiation ==
+
+ClientApp -> ClientCtrl : CreateWebTransportClient(server, port, authority, path)
+
+ClientCtrl -> ClientConn : ConnectionOpen()
+activate ClientConn
+note right : Create connection handle\nSet callback: ClientConnectionCallback\nContext: ClientController
+
+ClientConn -> ClientConn : State: IDLE → CONNECTING
+note right : Connection state machine transition
+
+ClientConn -> Net : ConnectionStart("server", 4443)
+note right : Initiate QUIC connection:\n- Server: localhost/127.0.0.1\n- Port: 4443\n- Address family: UNSPEC
+
+== Server Receives Connection ==
+
+Net -> ServerList : Incoming connection request
+note over Net : UDP packets containing\nQUIC Initial packets
+
+ServerList -> ServerList : LISTENER_EVENT_NEW_CONNECTION
+note left : Listener callback triggered\nwith new connection info
+
+ServerList -> ServerConn : Create connection object
+activate ServerConn
+note left : Allocate server connection\nState: IDLE
+
+ServerList -> ServerConn : SetCallbackHandler()
+note left : Set callback:\nServerConnectionCallback\nContext: ServerController
+
+ServerList -> ServerConn : ConnectionSetConfiguration()
+note left : Apply server configuration:\n- TLS certificate\n- ALPN protocols\n- Stream limits
+
+== QUIC Handshake Process ==
+
+Net -> Net : QUIC Handshake + TLS 1.3
+note over Net : **Handshake Steps:**\n1. Version negotiation\n2. Initial packet exchange\n3. TLS 1.3 handshake\n4. Transport parameter exchange\n5. Certificate validation\n6. Key derivation\n7. Handshake completion
+
+== Connection Established ==
+
+Net -> ClientConn : CONNECTION_EVENT_CONNECTED
+note right : Handshake complete\nConnection ready
+
+ClientConn -> ClientConn : State: CONNECTING → CONNECTED
+note right : State machine transition\nto connected state
+
+ClientConn -> ClientCtrl : Connection established
+note right : Notify controller\nof successful connection
+
+Net -> ServerConn : CONNECTION_EVENT_CONNECTED
+note left : Handshake complete\nConnection ready
+
+ServerConn -> ServerConn : State: IDLE → CONNECTED
+note left : State machine transition\nto connected state
+
+ServerConn -> ServerCtrl : Connection established
+note left : Notify controller\nof new client connection
+
+== Connection Ready ==
+
+note over ClientConn, ServerConn : QUIC connection established\nReady for HTTP/3 operations\nCan create streams and send datagrams
+
+ClientConn -> ClientConn : Ready for streams
+ServerConn -> ServerConn : Ready for streams
+
+@enduml

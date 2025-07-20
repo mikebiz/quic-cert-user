@@ -126,6 +126,55 @@ INITIALIZING → CONNECTING → CONNECTED → CLOSING → CLOSED
 [🔍 View SVG](svg/webtransport-over-quic-http3-complete-sequence.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-over-quic-http3-complete-sequence.puml)
 
+#### 1: Initialization Phase
+
+![Diagram](images/webtransport-seq-initialization-phase.png)
+
+[🔍 View SVG](svg/webtransport-seq-initialization-phase.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-initialization-phase.puml)
+
+#### 2: QUIC Connection Establishment
+
+![Diagram](images/webtransport-seq-quic-connection-establishment.png)
+
+[🔍 View SVG](svg/webtransport-seq-quic-connection-establishment.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-quic-connection-establishment.puml)
+
+#### 3: HTTP/3 Settings Exchange
+
+![Diagram](images/webtransport-seq-http3-settings-exchange.png)
+
+[🔍 View SVG](svg/webtransport-seq-http3-settings-exchange.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-http3-settings-exchange.puml)
+
+#### 4: WebTransport CONNECT Request
+
+![Diagram](images/webtransport-seq-wt-connect-request.png)
+
+[🔍 View SVG](svg/webtransport-seq-wt-connect-request.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-wt-connect-request.puml)
+
+#### 5: WebTransport Session Establishment
+
+![Diagram](images/webtransport-seq-wt-session-establishment.png)
+
+[🔍 View SVG](svg/webtransport-seq-wt-session-establishment.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-wt-session-establishment.puml)
+
+#### 6: WebTransport Data Exchange
+
+![Diagram](images/webtransport-seq-wt-data-exchange.png)
+
+[🔍 View SVG](svg/webtransport-seq-wt-data-exchange.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-wt-data-exchange.puml)
+
+#### 7: Graceful Shutdown
+
+![Diagram](images/webtransport-seq-graceful-shutdown.png)
+
+[🔍 View SVG](svg/webtransport-seq-graceful-shutdown.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-seq-graceful-shutdown.puml)
+
 ### Diagram 3: State Transitions
 
 ![Diagram](images/quic-http3-webtransport-state-transitions.png)

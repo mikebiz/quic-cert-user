@@ -1,4 +1,4 @@
-﻿// integrated-client.cpp - MsQuic Client with HTTP/3 WebTransport Support
+// integrated-client.cpp - MsQuic Client with HTTP/3 WebTransport Support
 // Compatible with MsQuic NuGet package 2.4.10
 #include <msquic.h>
 #include <iostream>
@@ -894,10 +894,10 @@ ClientConnectionCallback(
         std::cout << getClientTimestamp() << " CONNECTED to server!\n";
         std::cout << getClientTimestamp() << " Starting HTTP/3 handshake sequence...\n";
 
-        // SAFE: No threading, just reasonable delays
+        // CRITICAL: Add much longer delay to ensure server is fully ready
         std::cout << getClientTimestamp() << " === WAITING FOR SERVER TO BE FULLY READY ===\n";
         std::cout << getClientTimestamp() << " Waiting 2 seconds for server to complete initialization...\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // Keep this - it's not detached threading
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));  // 2 second delay!
 
         // === STEP 1: Send SETTINGS frame on control stream ===
         std::cout << "\n" << getClientTimestamp() << " === STEP 1: HTTP/3 Control Stream Setup ===\n";
@@ -905,7 +905,7 @@ ClientConnectionCallback(
 
         // === STEP 2: Wait for control stream to be established ===
         std::cout << "\n" << getClientTimestamp() << " === STEP 2: Waiting for control stream setup ===\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Keep this - it's not detached threading
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));  // Even longer wait
 
         // === STEP 3: Send WebTransport CONNECT on bidirectional stream ===
         std::cout << "\n" << getClientTimestamp() << " === STEP 3: WebTransport CONNECT Request ===\n";
@@ -913,44 +913,43 @@ ClientConnectionCallback(
 
         break;
     }
-    
-    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:{
-            std::cout << getClientTimestamp() << " PEER_STREAM_STARTED\n";
+    case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED: {
+        std::cout << getClientTimestamp() << " PEER_STREAM_STARTED\n";
 
-            // Get stream ID for debugging
-            QUIC_UINT62 streamId = 0;
-            uint32_t bufferLength = sizeof(streamId);
-            QUIC_STATUS idStatus = MsQuic->GetParam(Event->PEER_STREAM_STARTED.Stream, QUIC_PARAM_STREAM_ID, &bufferLength, &streamId);
+        // Get stream ID for debugging
+        QUIC_UINT62 streamId = 0;
+        uint32_t bufferLength = sizeof(streamId);
+        QUIC_STATUS idStatus = MsQuic->GetParam(Event->PEER_STREAM_STARTED.Stream, QUIC_PARAM_STREAM_ID, &bufferLength, &streamId);
 
-            if (QUIC_SUCCEEDED(idStatus)) {
-                std::cout << getClientTimestamp() << " Server started stream ID: " << streamId << "\n";
-            }
-
-            // Check if it's the server's test stream
-            if (Event->PEER_STREAM_STARTED.Flags & QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL) {
-                std::cout << getClientTimestamp() << " Server created UNIDIRECTIONAL stream (test stream)\n";
-            }
-            else {
-                std::cout << getClientTimestamp() << " Server created BIDIRECTIONAL stream\n";
-            }
-
-            // Set callback for server-initiated streams
-            MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, ClientStreamCallback, nullptr);
-            break;
+        if (QUIC_SUCCEEDED(idStatus)) {
+            std::cout << getClientTimestamp() << " Server started stream ID: " << streamId << "\n";
         }
-        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:{
-            std::cout << getClientTimestamp() << " CONNECTION_SHUTDOWN_COMPLETE\n";
-            MsQuic->ConnectionClose(Connection);
-            break;
+
+        // Check if it's the server's test stream
+        if (Event->PEER_STREAM_STARTED.Flags & QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL) {
+            std::cout << getClientTimestamp() << " Server created UNIDIRECTIONAL stream (test stream)\n";
         }
-        case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:{
-            std::cout << getClientTimestamp() << " DATAGRAM_RECEIVED ("
-                << Event->DATAGRAM_RECEIVED.Buffer->Length << " bytes)\n";
-            break;
+        else {
+            std::cout << getClientTimestamp() << " Server created BIDIRECTIONAL stream\n";
         }
-        default:
-            std::cout << getClientTimestamp() << " Other connection event: " << Event->Type << "\n";
-            break;
+
+        // Set callback for server-initiated streams
+        MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, ClientStreamCallback, nullptr);
+        break;
+    }
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE: {
+        std::cout << getClientTimestamp() << " CONNECTION_SHUTDOWN_COMPLETE\n";
+        MsQuic->ConnectionClose(Connection);
+        break;
+    }
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED: {
+        std::cout << getClientTimestamp() << " DATAGRAM_RECEIVED ("
+            << Event->DATAGRAM_RECEIVED.Buffer->Length << " bytes)\n";
+        break;
+    }
+    default:
+        std::cout << getClientTimestamp() << " Other connection event: " << Event->Type << "\n";
+        break;
     }
 
     std::cout << getClientTimestamp() << " === CLIENT CONNECTION CALLBACK END ===\n";

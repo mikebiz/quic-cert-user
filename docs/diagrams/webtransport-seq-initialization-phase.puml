@@ -1,0 +1,75 @@
+@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title WebTransport Initialization Phase
+
+actor "Client App" as ClientApp
+participant "Client\nController" as ClientCtrl
+participant "MsQuic\nClient APIs" as ClientAPI
+participant "Network" as Net
+participant "MsQuic\nServer APIs" as ServerAPI
+participant "Server\nListener" as ServerList
+participant "Server\nController" as ServerCtrl
+actor "Server App" as ServerApp
+
+== Client Initialization ==
+
+ClientApp -> ClientCtrl : Initialize()
+activate ClientCtrl
+
+ClientCtrl -> ClientAPI : MsQuicOpen2()
+note right : Open MsQuic library\nGet API function table
+
+ClientCtrl -> ClientAPI : RegistrationOpen()
+note right : Create registration with:\n- AppName: "WebTransportClient"\n- Profile: LOW_LATENCY
+
+ClientCtrl -> ClientAPI : ConfigurationOpen()
+note right : Configure:\n- ALPN: "h3"\n- Stream settings\n- Flow control windows
+
+ClientCtrl -> ClientAPI : ConfigurationLoadCredential()
+note right : Client credentials:\n- Type: CREDENTIAL_TYPE_NONE\n- Flags: CLIENT | NO_CERT_VALIDATION\n- Allow self-signed certs
+
+ClientCtrl -> ClientApp : Client initialized
+
+== Server Initialization ==
+
+ServerApp -> ServerCtrl : Initialize()
+activate ServerCtrl
+
+ServerCtrl -> ServerAPI : MsQuicOpen2()
+note left : Open MsQuic library\nGet API function table
+
+ServerCtrl -> ServerAPI : RegistrationOpen()
+note left : Create registration with:\n- AppName: "WebTransportServer"\n- Profile: LOW_LATENCY
+
+ServerCtrl -> ServerAPI : ConfigurationOpen()
+note left : Configure:\n- ALPN: "h3"\n- Stream settings\n- Flow control windows\n- Datagram support
+
+ServerCtrl -> ServerAPI : ConfigurationLoadCredential()
+note left : Server credentials:\n- Type: CERTIFICATE_HASH_STORE\n- Certificate from Windows store\n- Machine store location
+
+== Server Listener Setup ==
+
+ServerCtrl -> ServerList : ListenerOpen()
+activate ServerList
+
+ServerList -> ServerAPI : ListenerOpen()
+note left : Create listener with:\n- Callback: ServerListenerCallback\n- Context: ServerController
+
+ServerList -> ServerAPI : ListenerStart()
+note left : Start listening:\n- Port: 4443\n- Address: INADDR_ANY\n- ALPN: "h3"
+
+ServerList -> ServerApp : Ready for connections
+note over ServerList : Server now listening\nfor incoming QUIC connections
+
+== Initialization Complete ==
+
+note over ClientCtrl, ServerCtrl : Both client and server are initialized\nReady for connection establishment
+
+ClientCtrl -> ClientCtrl : State: Ready for connections
+ServerCtrl -> ServerCtrl : State: Listening for connections
+
+@enduml

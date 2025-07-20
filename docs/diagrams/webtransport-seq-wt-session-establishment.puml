@@ -1,0 +1,87 @@
+﻿@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title WebTransport Session Establishment Phase
+
+participant "Server\nRequest Stream" as ServerReqStream
+participant "Server\nController" as ServerCtrl
+participant "WebTransport\nSession (Server)" as ServerSession
+participant "Network" as Net
+participant "Client\nRequest Stream" as ClientReqStream
+participant "Client\nController" as ClientCtrl
+participant "WebTransport\nSession (Client)" as ClientSession
+
+== Server Processes Valid CONNECT ==
+
+note over ServerReqStream : Valid WebTransport CONNECT received\nReady to establish session
+
+ServerReqStream -> ServerCtrl : Create WebTransport session
+note left : Authority: localhost:4443\nPath: /webtransport
+
+ServerCtrl -> ServerSession : Create session object
+activate ServerSession
+note left : **Session Creation:**\nAuthority: localhost:4443\nPath: /webtransport\nState: INITIALIZING → CONNECTING
+
+ServerSession -> ServerSession : Process CONNECT request
+note left : **Session Processing:**\n1. Validate request parameters\n2. Check path authorization\n3. Allocate session resources\n4. Prepare for acceptance
+
+== Server Sends 200 OK Response ==
+
+ServerSession -> ServerReqStream : Accept WebTransport session
+note left : Session ready for establishment
+
+ServerReqStream -> ServerReqStream : Build HTTP/3 200 OK response
+note left : **HEADERS Frame:**\nFrame Type: 0x01\nFrame Length: 1\n**QPACK Encoded:**\n:status: 200 (static index 15 = 0x8F)
+
+ServerReqStream -> Net : Send HTTP/3 HEADERS(:status=200)
+note left : **Response Frame:**\n[0x01][0x01][0x8F]\nTotal: 3 bytes
+
+ServerSession -> ServerSession : State: CONNECTING → CONNECTED
+note left : Session established\nReady for WebTransport operations
+
+ServerSession -> ServerCtrl : WebTransport session established
+note left : Notify controller of\nsuccessful session creation
+
+== Client Receives 200 OK ==
+
+Net -> ClientReqStream : STREAM_EVENT_RECEIVE
+note right : Stream callback triggered\nwith response data
+
+ClientReqStream -> ClientReqStream : Parse HTTP/3 response
+note right : **Response Processing:**\n1. Parse frame type (0x01)\n2. Parse frame length (0x01)\n3. Parse status (0x8F = 200)
+
+ClientReqStream -> ClientReqStream : Detect :status=200
+note right : **Status Analysis:**\n0x8F = static table index 15\nIndex 15 = :status: 200\nWebTransport CONNECT accepted
+
+ClientReqStream -> ClientCtrl : WebTransport CONNECT accepted
+note right : Successful response received
+
+ClientCtrl -> ClientSession : Create client session
+activate ClientSession
+note right : **Client Session:**\nAuthority: localhost:4443\nPath: /webtransport\nState: CONNECTING → CONNECTED
+
+== Session Establishment Complete ==
+
+ClientSession -> ClientSession : Session ready
+note right : **Client Session Ready:**\n- Can create WebTransport streams\n- Can send WebTransport datagrams\n- Session fully established
+
+ServerSession -> ServerSession : Session ready
+note left : **Server Session Ready:**\n- Can accept WebTransport streams\n- Can receive WebTransport datagrams\n- Session fully established
+
+== WebTransport Session Active ==
+
+note over ClientSession, ServerSession : **WebTransport Session Established**\nBoth client and server have active sessions\nReady for bidirectional communication
+
+note over ClientSession : **Client Capabilities:**\n- createBidirectionalStream()\n- createUnidirectionalStream()\n- sendDatagram()\n- Session management
+
+note over ServerSession : **Server Capabilities:**\n- acceptBidirectionalStream()\n- acceptUnidirectionalStream()\n- receiveDatagram()\n- Session management
+
+ClientSession -> ClientCtrl : Session established notification
+ServerSession -> ServerCtrl : Session established notification
+
+note over ClientCtrl, ServerCtrl : WebTransport session establishment complete\nReady for application data exchange\nNext: Create WebTransport streams/datagrams
+
+@enduml

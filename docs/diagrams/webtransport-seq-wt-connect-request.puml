@@ -1,0 +1,94 @@
+﻿@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title WebTransport CONNECT Request Phase
+
+participant "Client\nController" as ClientCtrl
+participant "QUIC\nConnection\n(Client)" as ClientConn
+participant "Client\nRequest Stream" as ClientReqStream
+participant "Network" as Net
+participant "Server\nRequest Stream" as ServerReqStream
+participant "QUIC\nConnection\n(Server)" as ServerConn
+participant "Server\nController" as ServerCtrl
+
+== Create WebTransport CONNECT Stream ==
+
+note over ClientCtrl : HTTP/3 settings exchange complete\nReady to initiate WebTransport session
+
+ClientCtrl -> ClientConn : Create bidirectional stream (ID=0)
+note right : Request/response stream\nfor WebTransport CONNECT
+
+ClientConn -> ClientReqStream : StreamOpen(BIDIRECTIONAL)
+activate ClientReqStream
+note right : Stream type: Bidirectional\nClient-initiated\nStream ID: 0
+
+ClientReqStream -> ClientReqStream : StreamStart()
+note right : Start stream with\nIMMEDIATE flag
+
+== Build WebTransport CONNECT Request ==
+
+ClientCtrl -> ClientReqStream : Send WebTransport CONNECT
+note right : Initiate WebTransport\nhandshake request
+
+ClientReqStream -> ClientReqStream : Build HEADERS frame
+note right : **HTTP/3 HEADERS Frame:**\nFrame Type: 0x01\nFrame Length: variable\n**QPACK Encoded Headers**
+
+ClientReqStream -> ClientReqStream : Encode QPACK headers
+note right : **Required Headers:**\n:method: CONNECT (static index 5)\n:protocol: webtransport (literal)\n:scheme: https (static index 13)\n:authority: localhost:4443 (literal)\n:path: /webtransport (literal)
+
+ClientReqStream -> ClientReqStream : Create complete frame
+note right : **Complete HEADERS Frame:**\n[0x01][length][QPACK data]\nTotal: ~59 bytes
+
+ClientReqStream -> Net : Send HEADERS frame
+note right : HTTP/3 HEADERS frame\nwith WebTransport CONNECT
+
+== Server Receives CONNECT Request ==
+
+Net -> ServerConn : PEER_STREAM_STARTED (ID=0, BIDIRECTIONAL)
+note left : Server connection callback\nfor new bidirectional stream
+
+ServerConn -> ServerReqStream : Create stream object
+activate ServerReqStream
+note left : Allocate request stream handler\nSet stream callback
+
+ServerConn -> ServerReqStream : SetCallbackHandler()
+note left : Set callback:\nServerStreamCallback\nContext: ServerConnection
+
+ServerConn -> ServerReqStream : StreamReceiveSetEnabled(TRUE)
+note left : Enable data reception\non bidirectional stream
+
+Net -> ServerReqStream : STREAM_EVENT_RECEIVE
+note left : Stream callback triggered\nwith HEADERS frame data
+
+== Parse WebTransport CONNECT ==
+
+ServerReqStream -> ServerReqStream : Parse HTTP/3 frame
+note left : **Frame Processing:**\n1. Decode frame type (0x01)\n2. Extract frame length\n3. Get QPACK payload
+
+ServerReqStream -> ServerReqStream : Decode QPACK headers
+note left : **QPACK Decoding:**\n1. Static table lookups\n2. Literal header decoding\n3. Header name/value pairs
+
+ServerReqStream -> ServerReqStream : Extract headers
+note left : **Decoded Headers:**\n:method: CONNECT\n:protocol: webtransport\n:scheme: https\n:authority: localhost:4443\n:path: /webtransport
+
+== Validate WebTransport Request ==
+
+ServerReqStream -> ServerReqStream : Validate CONNECT request
+note left : **Validation Checks:**\n1. :method = CONNECT ✓\n2. :protocol = webtransport ✓\n3. :scheme = https ✓\n4. :authority present ✓\n5. :path present ✓
+
+ServerReqStream -> ServerCtrl : Valid WebTransport request
+note left : **Request Details:**\nAuthority: localhost:4443\nPath: /webtransport\nProtocol: webtransport
+
+== CONNECT Request Complete ==
+
+note over ClientReqStream, ServerReqStream : WebTransport CONNECT request sent and received\nServer has validated the request\nReady for session establishment response
+
+ClientReqStream -> ClientReqStream : Waiting for response
+ServerReqStream -> ServerReqStream : Request validated
+
+note over ClientCtrl, ServerCtrl : CONNECT request phase complete\nNext: Server sends response (200 OK or error)
+
+@enduml

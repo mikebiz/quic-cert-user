@@ -1,0 +1,99 @@
+﻿@startuml
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title Enhanced HTTP/3 Settings Exchange Phase
+
+participant "QUIC\nConnection\n(Client)" as ClientConn
+participant "Client\nControl Stream" as ClientCtrlStream
+participant "Network" as Net
+participant "Server\nControl Stream" as ServerCtrlStream
+participant "QUIC\nConnection\n(Server)" as ServerConn
+
+== Client Sends HTTP/3 Settings ==
+
+note over ClientConn : Connection established\nNow ready for HTTP/3 setup
+
+ClientConn -> ClientCtrlStream : Create control stream (ID=2, UNIDIRECTIONAL)
+activate ClientCtrlStream
+note right : Stream type: Unidirectional\nClient-initiated control stream\nStream ID: 2
+
+ClientCtrlStream -> ClientCtrlStream : Build control stream data
+note right : **Control Stream Format:**\n1. Stream Type: 0x00 (Control)\n2. SETTINGS Frame
+
+ClientCtrlStream -> ClientCtrlStream : Create SETTINGS frame
+note right : **MANDATORY WebTransport SETTINGS:**\n- ENABLE_WEBTRANSPORT (0x2b603742) = 1\n- SETTINGS_H3_DATAGRAM (0x33) = 1\n- MAX_FIELD_SECTION_SIZE (0x06) = 16384\n- QPACK_MAX_TABLE_CAPACITY (0x01) = 0\n- QPACK_BLOCKED_STREAMS (0x07) = 0
+
+ClientCtrlStream -> Net : Send control stream data
+note right : **Complete Control Stream:**\nStream Type (0x00) +\nSETTINGS frame with\nWebTransport requirements
+
+== Server Receives Client Settings ==
+
+Net -> ServerConn : PEER_STREAM_STARTED (ID=2, UNIDIRECTIONAL)
+note left : Server connection callback\ntriggered for new stream
+
+ServerConn -> ServerCtrlStream : Create stream object
+activate ServerCtrlStream
+note left : Allocate control stream handler\nSet stream callback
+
+ServerConn -> ServerCtrlStream : SetCallbackHandler()
+note left : Set callback:\nServerStreamCallback\nContext: ServerConnection
+
+Net -> ServerCtrlStream : STREAM_EVENT_RECEIVE
+note left : Stream callback triggered\nwith settings data
+
+ServerCtrlStream -> ServerCtrlStream : Parse control stream
+note left : **Processing Steps:**\n1. Verify stream type (0x00)\n2. Parse SETTINGS frame\n3. Decode settings values\n4. Validate WebTransport requirements
+
+ServerCtrlStream -> ServerCtrlStream : Validate WebTransport requirements
+note left : **MANDATORY Validation:**\n✓ ENABLE_WEBTRANSPORT = 1\n✓ SETTINGS_H3_DATAGRAM = 1\n✓ Client supports datagrams\n✓ WebTransport capability confirmed
+
+== Server Sends HTTP/3 Settings ==
+
+deactivate ServerCtrlStream
+ServerConn -> ServerCtrlStream : Create control stream (ID=3, UNIDIRECTIONAL)
+activate ServerCtrlStream
+note left : Stream type: Unidirectional\nServer-initiated control stream\nStream ID: 3
+
+ServerCtrlStream -> ServerCtrlStream : Build SETTINGS response
+note left : **Server SETTINGS (WebTransport):**\n- ENABLE_WEBTRANSPORT = 1\n- SETTINGS_H3_DATAGRAM = 1\n- MAX_FIELD_SECTION_SIZE = 16384\n- Server stream limits\n- Flow control settings
+
+ServerCtrlStream -> Net : Send server SETTINGS
+note left : Server control stream\nwith WebTransport-enabled SETTINGS
+
+== Client Receives Server Settings ==
+
+Net -> ClientConn : PEER_STREAM_STARTED (ID=3, UNIDIRECTIONAL)
+note right : Client connection callback\nfor server control stream
+
+deactivate ClientCtrlStream
+ClientConn -> ClientCtrlStream : Process server stream
+activate ClientCtrlStream
+note right : Handle server-initiated\ncontrol stream
+
+Net -> ClientCtrlStream : STREAM_EVENT_RECEIVE
+note right : Receive server SETTINGS
+
+ClientCtrlStream -> ClientCtrlStream : Parse server SETTINGS
+note right : **Validate Server Support:**\n✓ ENABLE_WEBTRANSPORT = 1\n✓ SETTINGS_H3_DATAGRAM = 1\n✓ Server supports WebTransport\n✓ Datagram capability confirmed
+
+== Transport Parameter Verification ==
+
+note over ClientConn, ServerConn : **QUIC Transport Parameter Check**\nBoth endpoints must have negotiated:\nmax_datagram_frame_size > 0
+
+ClientCtrlStream -> ClientCtrlStream : Verify QUIC datagrams enabled
+note right : **QUIC Layer Verification:**\nConfirm max_datagram_frame_size > 0\nwas negotiated during handshake
+
+ServerCtrlStream -> ServerCtrlStream : Verify QUIC datagrams enabled
+note left : **QUIC Layer Verification:**\nConfirm max_datagram_frame_size > 0\nwas negotiated during handshake
+
+== HTTP/3 Settings Complete ==
+
+note over ClientCtrlStream, ServerCtrlStream : **HTTP/3 Settings Exchange Complete**\n\n**WebTransport Requirements Satisfied:**\n✓ ENABLE_WEBTRANSPORT = 1 (both sides)\n✓ SETTINGS_H3_DATAGRAM = 1 (both sides)\n✓ QUIC datagrams enabled (transport layer)\n✓ Control streams established (ID 2/3)\n\n**Ready for WebTransport Operations:**\n- WebTransport CONNECT requests\n- Bidirectional stream creation\n- Unidirectional stream creation\n- Datagram transmission
+
+ClientCtrlStream -> ClientCtrlStream : HTTP/3 + WebTransport ready
+ServerCtrlStream -> ServerCtrlStream : HTTP/3 + WebTransport ready
+
+note over ClientConn, ServerConn : **WebTransport Capability Fully Negotiated**\nReady for CONNECT requests and session establishment
+@enduml

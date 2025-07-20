@@ -1,0 +1,196 @@
+﻿@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title Enhanced WebTransport Graceful Shutdown Phase
+
+actor "Client App" as ClientApp
+participant "Client\nController" as ClientCtrl
+participant "Client\nWT Session" as ClientWTSession
+participant "Client\nWT Streams" as ClientStreams
+participant "QUIC\nConnection\n(Client)" as ClientConn
+participant "Network" as Net
+participant "QUIC\nConnection\n(Server)" as ServerConn
+participant "Server\nWT Streams" as ServerStreams
+participant "Server\nWT Session" as ServerWTSession
+participant "Server\nController" as ServerCtrl
+participant "Server\nListener" as ServerList
+
+== Application Initiated Shutdown ==
+
+ClientApp -> ClientCtrl : Shutdown()
+note right : Application requests\ngraceful shutdown
+
+ClientCtrl -> ClientCtrl : Begin shutdown sequence
+note right : **Shutdown Steps:**\n1. Signal session drain\n2. Close WebTransport streams\n3. Send session close\n4. Close QUIC connection\n5. Cleanup resources
+
+== WebTransport Session Drain Signal ==
+
+ClientCtrl -> ClientWTSession : Initiate session drain
+activate ClientWTSession
+note right : **Session Drain Process:**\n- Stop accepting new streams\n- Prepare existing streams for closure\n- Signal intent to terminate
+
+ClientWTSession -> ClientWTSession : Send WT_DRAIN_SESSION capsule
+note right : **WT_DRAIN_SESSION:**\n- WebTransport-specific drain signal\n- Allows graceful session termination\n- Peer can prepare for closure
+
+ClientWTSession -> Net : WT_DRAIN_SESSION capsule
+note right : **Drain Signal Transmission:**\nCapsule type: WT_DRAIN_SESSION\nIndicates intent to close session
+
+== Server Receives Drain Signal ==
+
+Net -> ServerWTSession : WT_DRAIN_SESSION received
+activate ServerWTSession
+note left : **Server Drain Processing:**\n- Acknowledge drain signal\n- Prepare for session termination\n- Complete pending operations
+
+ServerWTSession -> ServerWTSession : Process drain signal
+note left : **Drain Response:**\n- Stop accepting new WebTransport streams\n- Complete existing stream operations\n- Prepare session cleanup
+
+ServerWTSession -> ServerStreams : Prepare streams for closure
+note left : **Stream Preparation:**\n- Finish sending pending data\n- Prepare FIN frames\n- Ensure data acknowledgment
+
+== WebTransport Stream Graceful Closure ==
+
+ClientWTSession -> ClientStreams : Close all WebTransport streams
+activate ClientStreams
+note right : **Stream Closure Order:**\n1. Unidirectional streams first\n2. Bidirectional streams\n3. Await acknowledgments
+
+ClientStreams -> ClientStreams : Send FIN on all streams
+note right : **Stream FIN Process:**\n- Send remaining buffered data\n- Send FIN frame on each stream\n- Mark send direction closed
+
+ClientStreams -> Net : Stream FIN frames
+note right : **Multiple FIN Transmission:**\nFIN frames for all active\nWebTransport streams
+
+== Server Stream Closure Processing ==
+
+Net -> ServerStreams : Multiple PEER_SEND_SHUTDOWN events
+activate ServerStreams
+note left : **Server Stream Events:**\nPEER_SEND_SHUTDOWN for\neach WebTransport stream
+
+ServerStreams -> ServerStreams : Process all stream FINs
+note left : **FIN Processing:**\n- Acknowledge received FINs\n- Send response FINs\n- Complete data transmission
+
+ServerStreams -> ServerStreams : Send response FINs
+note left : **Bidirectional FIN:**\nServer sends FIN on its\nsend direction for each stream
+
+ServerStreams -> Net : Response FIN frames
+note left : **Server FIN Response:**\nFIN acknowledgment for\nall WebTransport streams
+
+== Stream Acknowledgment & Completion ==
+
+Net -> ClientStreams : Server FIN acknowledgments
+note right : **Stream Closure Confirmation:**\nAll WebTransport streams\nfully closed bidirectionally
+
+ClientStreams -> ClientStreams : All streams SHUTDOWN_COMPLETE
+note right : **Stream Cleanup:**\n- All streams fully closed\n- Resources deallocated\n- Buffers freed
+
+ClientStreams -> ClientWTSession : All streams closed
+deactivate ClientStreams
+
+ServerStreams -> ServerStreams : All streams SHUTDOWN_COMPLETE
+note left : **Server Stream Cleanup:**\n- All WebTransport streams closed\n- Resources freed\n- Session ready for termination
+
+ServerStreams -> ServerWTSession : All streams closed
+deactivate ServerStreams
+
+== WebTransport Session Termination ==
+
+ClientWTSession -> ClientWTSession : Send CLOSE_WEBTRANSPORT_SESSION
+note right : **Session Close Frame:**\n- Final WebTransport session closure\n- Include session error code\n- Prepare for connection termination
+
+ClientWTSession -> Net : CLOSE_WEBTRANSPORT_SESSION frame
+note right : **Session Closure:**\nWebTransport session\nofficially terminated
+
+Net -> ServerWTSession : CLOSE_WEBTRANSPORT_SESSION received
+note left : **Server Session Termination:**\n- Process session close frame\n- Clean up session state\n- Prepare connection for closure
+
+ServerWTSession -> ServerWTSession : Clean up session resources
+note left : **Session Cleanup:**\n- Deallocate session state\n- Clean up stream mappings\n- Free session resources
+
+ClientWTSession -> ClientWTSession : Session state: CONNECTED → CLOSED
+deactivate ClientWTSession
+
+ServerWTSession -> ServerWTSession : Session state: CONNECTED → CLOSED
+deactivate ServerWTSession
+
+== HTTP/3 GOAWAY Exchange (Optional) ==
+
+ServerCtrl -> ServerConn : Send HTTP/3 GOAWAY
+activate ServerConn
+note left : **GOAWAY Frame:**\n- HTTP/3 graceful shutdown signal\n- Indicates no new requests accepted\n- Allows existing requests to complete
+
+ServerConn -> Net : HTTP/3 GOAWAY frame
+note left : **Connection Drain Signal:**\nHTTP/3 GOAWAY indicates\nconnection entering drain state
+
+Net -> ClientConn : HTTP/3 GOAWAY received
+activate ClientConn
+note right : **Client GOAWAY Processing:**\n- No new requests allowed\n- Existing operations continue\n- Prepare for connection closure
+
+== Data Acknowledgment Wait ==
+
+ClientCtrl -> ClientCtrl : Wait for data acknowledgment
+note right : **Critical Wait Period:**\n- Ensure all data acknowledged\n- Wait for QUIC ACK frames\n- Prevent data loss during closure
+
+ClientCtrl -> ClientCtrl : Monitor QUIC ACK status
+note right : **ACK Monitoring:**\n- Check stream data acknowledgment\n- Verify connection flow control\n- Ensure safe closure timing
+
+note over ClientConn, ServerConn : **Acknowledgment Wait Period**\nBoth sides ensure all data acknowledged\nbefore proceeding with connection closure
+
+== QUIC Connection Graceful Shutdown ==
+
+ClientConn -> ClientConn : All data acknowledged
+note right : **Safe Closure Condition:**\n- All streams closed\n- All data acknowledged\n- Ready for connection termination
+
+ClientConn -> ClientConn : State: CONNECTED → DRAINING
+note right : **Connection State Transition:**\nTransition to draining state\nPrepare for final closure
+
+ClientConn -> Net : CONNECTION_CLOSE frame
+note right : **QUIC CONNECTION_CLOSE:**\nFrame type: CONNECTION_CLOSE\nError code: NO_ERROR (0)\nReason: "Graceful shutdown"
+
+== Server Connection Shutdown ==
+
+Net -> ServerConn : CONNECTION_CLOSE received
+note left : **Connection Close Processing:**\nGraceful shutdown request\nfrom client received
+
+ServerConn -> ServerConn : State: CONNECTED → DRAINING
+note left : **Server State Transition:**\nProcess shutdown request\nEnter draining state
+
+ServerConn -> ServerConn : CONNECTION_EVENT_SHUTDOWN_COMPLETE
+note left : **Shutdown Event Processing:**\nCleanup connection state\nPrepare final resources cleanup
+
+ServerConn -> ServerConn : State: DRAINING → CLOSED
+note left : **Final State:**\nConnection fully closed\nAll resources freed
+
+ServerConn -> ServerCtrl : Connection closed notification
+deactivate ServerConn
+note left : **Cleanup Notification:**\nRemove from active connections\nUpdate server state
+
+== Client Connection Cleanup ==
+
+ClientConn -> ClientConn : CONNECTION_EVENT_SHUTDOWN_COMPLETE
+note right : **Client Shutdown Event:**\nConnection shutdown complete\nCleanup phase initiated
+
+ClientConn -> ClientConn : State: DRAINING → CLOSED
+note right : **Final Client State:**\nConnection fully closed\nResources deallocated
+
+ClientConn -> ClientCtrl : Connection closed notification
+deactivate ClientConn
+note right : **Client Cleanup:**\nNotify application layer\nShutdown sequence complete
+
+== Final Resource Cleanup ==
+
+ClientCtrl -> ClientCtrl : Cleanup all resources
+note right : **Client Resource Cleanup:**\n- Close MsQuic handles\n- Free memory allocations\n- Reset connection state
+
+ServerCtrl -> ServerList : Update connection count
+note left : **Server Cleanup:**\n- Remove connection from pool\n- Update listener statistics\n- Free server resources
+
+ServerCtrl -> ServerCtrl : Cleanup complete
+note left : **Server Resource Cleanup:**\n- All handles closed\n- Memory freed\n- Ready for new connections
+
+== Graceful Shutdown Complete ==
+
+note over ClientApp, ServerList : **Graceful Shutdown Successfully Completed**\n\n**Key Achievements:**\n- All WebTransport streams properly closed\n- Session termination handled correctly\n- Data loss prevented through acknowledgment\n- QUIC connection gracefully terminated\n- All resources properly cleaned up\n\n**Timeline Summary:**\n1. Application initiated shutdown\n2. WebTransport session drain signaled\n3. All streams gracefully closed\n4. Session officially terminated\n5. Data acknowledgment ensured\n6. QUIC connection cleanly closed\n7. Resources fully deallocated
+
+@enduml

@@ -1,4 +1,4 @@
-ï»¿// integrated-server.cpp - MsQuic Server with HTTP/3 WebTransport Support
+// integrated-server.cpp - MsQuic Server with HTTP/3 WebTransport Support
 // Compatible with MsQuic NuGet package 2.4.10
 #include <msquic.h>
 #include <iostream>
@@ -239,7 +239,7 @@ public:
 
             }
             else if ((firstByte & 0x40) != 0) {
-                // 01xxxxxx - Literal Header Field with Incremental Indexing â€” Indexed Name
+                // 01xxxxxx - Literal Header Field with Incremental Indexing — Indexed Name
                 auto nameIndex = decodeInteger(6);
                 if (!nameIndex || *nameIndex == 0 || *nameIndex >= QPACK_STATIC_TABLE.size()) {
                     std::cout << "  [ERROR] Invalid name index\n";
@@ -259,7 +259,7 @@ public:
 
             }
             else if ((firstByte & 0x20) != 0) {
-                // 001xxxxx - Literal Header Field with Incremental Indexing â€” Literal Name
+                // 001xxxxx - Literal Header Field with Incremental Indexing — Literal Name
                 position++; // Skip the pattern byte
 
                 auto name = decodeString();
@@ -705,6 +705,56 @@ static void parseSettingsPayload(const std::vector<uint8_t>& payload) {
 // CRITICAL FIX: Try a different approach - Force stream acceptance
 // Add this function to manually handle the stream issue
 
+static void ForceStreamAcceptance(HQUIC connection) {
+    std::cout << getTimestamp() << " === IMMEDIATE STREAM DIAGNOSTIC ===\n";
+
+    // Start a thread that checks every second for 10 seconds
+    std::thread([connection]() {
+        for (int i = 0; i < 10; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+            // Check connection statistics
+            QUIC_STATISTICS_V2 stats = {};
+            uint32_t statsSize = sizeof(stats);
+            QUIC_STATUS statStatus = MsQuic->GetParam(connection, QUIC_PARAM_CONN_STATISTICS_V2, &statsSize, &stats);
+
+            if (QUIC_SUCCEEDED(statStatus)) {
+                std::cout << getTimestamp() << " [" << i << "] Stats check:\n";
+                std::cout << getTimestamp() << "   RecvTotalPackets: " << stats.RecvTotalPackets << "\n";
+                std::cout << getTimestamp() << "   RecvTotalStreamBytes: " << stats.RecvTotalStreamBytes << "\n";
+                std::cout << getTimestamp() << "   SendTotalStreamBytes: " << stats.SendTotalStreamBytes << "\n";
+
+                if (stats.RecvTotalStreamBytes > 0) {
+                    std::cout << getTimestamp() << " *** CONFIRMED BUG: Stream data received but no PEER_STREAM_STARTED events! ***\n";
+                    std::cout << getTimestamp() << " Client sent " << stats.RecvTotalStreamBytes << " bytes but server callbacks never fired\n";
+                    std::cout << getTimestamp() << " This is a MsQuic configuration or version issue\n";
+
+                    // Also check what MsQuic version we're using
+                    uint32_t version[4] = {};
+                    uint32_t versionSize = sizeof(version);
+                    if (QUIC_SUCCEEDED(MsQuic->GetParam(nullptr, QUIC_PARAM_GLOBAL_LIBRARY_VERSION, &versionSize, version))) {
+                        std::cout << getTimestamp() << " MsQuic library version: " << version[0] << "." << version[1] << "." << version[2] << "." << version[3] << "\n";
+                    }
+
+                    break;
+                }
+
+                if (stats.RecvTotalPackets == 0) {
+                    std::cout << getTimestamp() << " No packets received yet - client may not be connecting\n";
+                }
+                else {
+                    std::cout << getTimestamp() << " Packets received but no stream data yet\n";
+                }
+            }
+            else {
+                std::cout << getTimestamp() << " Failed to get connection statistics\n";
+            }
+        }
+
+        std::cout << getTimestamp() << " Stream diagnostic completed\n";
+        }).detach();
+}
+
 // DIAGNOSTIC FUNCTION: Add this to help debug the issue
 static void DiagnoseStreamIssue(HQUIC connection) {
     std::cout << getTimestamp() << " === STREAM ISSUE DIAGNOSIS ===\n";
@@ -1043,23 +1093,172 @@ QUIC_STATUS QUIC_API ServerConnectionCallback(
         std::cout << getTimestamp() << " QUIC_CONNECTION_EVENT_CONNECTED\n";
         std::cout << getTimestamp() << " Client connected successfully!\n";
 
-        // Basic connection info - NO THREADING
+        // Get connection info
+        QUIC_ADDR localAddr = {};
+        uint32_t addrSize = sizeof(localAddr);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_LOCAL_ADDRESS, &addrSize, &localAddr))) {
+            std::cout << getTimestamp() << " Local address configured\n";
+        }
+
+        QUIC_ADDR remoteAddr = {};
+        addrSize = sizeof(remoteAddr);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_REMOTE_ADDRESS, &addrSize, &remoteAddr))) {
+            std::cout << getTimestamp() << " Remote address: configured\n";
+        }
+
+        // Check ALPN negotiation
         uint8_t alpnBuffer[16] = {};
         uint32_t alpnSize = sizeof(alpnBuffer);
-        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_TLS_NEGOTIATED_ALPN, &alpnSize, alpnBuffer))) {
+        QUIC_STATUS alpnStatus = MsQuic->GetParam(Connection, QUIC_PARAM_TLS_NEGOTIATED_ALPN, &alpnSize, alpnBuffer);
+        if (QUIC_SUCCEEDED(alpnStatus) && alpnSize > 0) {
             std::cout << getTimestamp() << " Negotiated ALPN: ";
             for (uint32_t i = 0; i < alpnSize; ++i) {
                 std::cout << (char)alpnBuffer[i];
             }
             std::cout << "\n";
         }
+        else {
+            std::cout << getTimestamp() << " WARNING: No ALPN negotiated or failed to get ALPN\n";
+        }
 
-        std::cout << getTimestamp() << " Connection is ready for streams\n";
-        std::cout << getTimestamp() << " === WAITING FOR CLIENT STREAMS (SAFE MODE) ===\n";
+        std::cout << getTimestamp() << " Connection is now ready for streams\n";
+
+        // === CONNECTION PARAMETER INSPECTION ===
+        std::cout << getTimestamp() << " === CONNECTION PARAMETER INSPECTION ===\n";
+
+        // Check negotiated stream limits
+        uint16_t localBidiStreams = 0;
+        uint32_t paramSize = sizeof(localBidiStreams);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT, &paramSize, &localBidiStreams))) {
+            std::cout << getTimestamp() << " Local bidirectional stream count: " << localBidiStreams << "\n";
+        }
+
+        uint16_t localUnidiStreams = 0;
+        paramSize = sizeof(localUnidiStreams);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, &paramSize, &localUnidiStreams))) {
+            std::cout << getTimestamp() << " Local unidirectional stream count: " << localUnidiStreams << "\n";
+        }
+
+        // Check stream IDs available
+        uint64_t maxStreamIds[4] = {};
+        paramSize = sizeof(maxStreamIds);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_MAX_STREAM_IDS, &paramSize, maxStreamIds))) {
+            std::cout << getTimestamp() << " Max stream IDs:\n";
+            std::cout << getTimestamp() << "   Client Bidirectional: " << maxStreamIds[0] << "\n";
+            std::cout << getTimestamp() << "   Server Bidirectional: " << maxStreamIds[1] << "\n";
+            std::cout << getTimestamp() << "   Client Unidirectional: " << maxStreamIds[2] << "\n";
+            std::cout << getTimestamp() << "   Server Unidirectional: " << maxStreamIds[3] << "\n";
+        }
+
+        // Check connection settings
+        QUIC_SETTINGS connSettings = {};
+        paramSize = sizeof(connSettings);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_SETTINGS, &paramSize, &connSettings))) {
+            std::cout << getTimestamp() << " Connection settings:\n";
+            std::cout << getTimestamp() << "   PeerBidiStreamCount: " << connSettings.PeerBidiStreamCount << "\n";
+            std::cout << getTimestamp() << "   PeerUnidiStreamCount: " << connSettings.PeerUnidiStreamCount << "\n";
+            std::cout << getTimestamp() << "   ConnFlowControlWindow: " << connSettings.ConnFlowControlWindow << "\n";
+            std::cout << getTimestamp() << "   StreamRecvWindowDefault: " << connSettings.StreamRecvWindowDefault << "\n";
+        }
+
+        std::cout << getTimestamp() << " === END CONNECTION PARAMETER INSPECTION ===\n";
+
+        // === TESTING SERVER STREAM CREATION ===
+        std::cout << getTimestamp() << " === TESTING SERVER STREAM CREATION ===\n";
+        HQUIC testStream = nullptr;
+        QUIC_STATUS testStatus = MsQuic->StreamOpen(
+            Connection,
+            QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL,
+            ServerStreamCallback,
+            reinterpret_cast<void*>(0x9999), // Test context
+            &testStream
+        );
+
+        if (QUIC_SUCCEEDED(testStatus)) {
+            std::cout << getTimestamp() << " Server test stream created successfully\n";
+
+            testStatus = MsQuic->StreamStart(testStream, QUIC_STREAM_START_FLAG_IMMEDIATE);
+            if (QUIC_SUCCEEDED(testStatus)) {
+                std::cout << getTimestamp() << " Server test stream started successfully\n";
+
+                // Send a test message
+                std::string testMsg = "Hello from server test stream";
+                QUIC_BUFFER testBuf = {};
+                testBuf.Buffer = reinterpret_cast<uint8_t*>(testMsg.data());
+                testBuf.Length = static_cast<uint32_t>(testMsg.size());
+
+                testStatus = MsQuic->StreamSend(testStream, &testBuf, 1, QUIC_SEND_FLAG_FIN, nullptr);
+                std::cout << getTimestamp() << " Server test stream send status: 0x" << std::hex << testStatus << std::dec << "\n";
+            }
+            else {
+                std::cout << getTimestamp() << " Server test stream start FAILED: 0x" << std::hex << testStatus << std::dec << "\n";
+            }
+        }
+        else {
+            std::cout << getTimestamp() << " Server test stream creation FAILED: 0x" << std::hex << testStatus << std::dec << "\n";
+        }
+
+        // === ENHANCED EVENT MONITORING ===
+        std::cout << getTimestamp() << " === WAITING FOR CLIENT STREAMS ===\n";
         std::cout << getTimestamp() << " Will monitor for PEER_STREAM_STARTED events (type 6)...\n";
+        std::cout << getTimestamp() << " Expected client streams:\n";
+        std::cout << getTimestamp() << "   - Control stream (ID 2, unidirectional)\n";
+        std::cout << getTimestamp() << "   - WebTransport CONNECT (ID 0, bidirectional)\n";
 
-        // NO THREADING - NO ForceStreamAcceptance() call
-        // Just wait for normal MsQuic events
+        ForceStreamAcceptance(Connection);
+
+        // IMMEDIATE CHECK: See current state right now
+        QUIC_STATISTICS_V2 currentStats = {};
+        uint32_t currentStatsSize = sizeof(currentStats);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(Connection, QUIC_PARAM_CONN_STATISTICS_V2, &currentStatsSize, &currentStats))) {
+            std::cout << getTimestamp() << " IMMEDIATE stats at connection:\n";
+            std::cout << getTimestamp() << "   RecvTotalPackets: " << currentStats.RecvTotalPackets << "\n";
+            std::cout << getTimestamp() << "   RecvTotalStreamBytes: " << currentStats.RecvTotalStreamBytes << "\n";
+        }
+        else {
+            std::cout << getTimestamp() << " Failed to get immediate stats\n";
+        }
+
+        // Also get MsQuic version info
+        uint32_t libVersion[4] = {};
+        uint32_t libVersionSize = sizeof(libVersion);
+        if (QUIC_SUCCEEDED(MsQuic->GetParam(nullptr, QUIC_PARAM_GLOBAL_LIBRARY_VERSION, &libVersionSize, libVersion))) {
+            std::cout << getTimestamp() << " MsQuic library version: " << libVersion[0] << "." << libVersion[1] << "." << libVersion[2] << "." << libVersion[3] << "\n";
+        }
+
+        // EXPERIMENTAL: Try to force stream callback registration
+// Create a background thread to monitor for streams
+        std::cout << getTimestamp() << " === EXPERIMENTAL: STREAM MONITORING THREAD ===\n";
+
+        // Create a detached thread that will try to detect streams
+        std::thread([Connection]() {
+            std::cout << getTimestamp() << " Stream monitoring thread started\n";
+
+            for (int attempt = 0; attempt < 50; ++attempt) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                // Try to query connection statistics to see if streams exist
+                QUIC_STATISTICS_V2 stats = {};
+                uint32_t statsSize = sizeof(stats);
+                QUIC_STATUS statStatus = MsQuic->GetParam(Connection, QUIC_PARAM_CONN_STATISTICS_V2, &statsSize, &stats);
+
+                if (QUIC_SUCCEEDED(statStatus)) {
+                    if (stats.RecvTotalPackets > 0) {
+                        std::cout << getTimestamp() << " DETECTED: Connection has received "
+                            << stats.RecvTotalPackets << " packets\n";
+                        std::cout << getTimestamp() << " Total stream bytes: " << stats.RecvTotalStreamBytes << "\n";
+
+                        if (stats.RecvTotalStreamBytes > 0) {
+                            std::cout << getTimestamp() << " *** STREAM DATA DETECTED BUT NO RECEIVE EVENTS! ***\n";
+                            std::cout << getTimestamp() << " This confirms streams exist but callbacks aren't set\n";
+                            break;
+                        }
+                    }
+                }
+            }
+
+            std::cout << getTimestamp() << " Stream monitoring thread completed\n";
+            }).detach();
 
         break;
     }
@@ -1214,16 +1413,55 @@ QUIC_STATUS QUIC_API ServerListenerCallback(
 
     if (Event->Type == QUIC_LISTENER_EVENT_NEW_CONNECTION) {
         std::cout << getTimestamp() << " QUIC_LISTENER_EVENT_NEW_CONNECTION\n";
-        std::cout << getTimestamp() << " New connection: " << std::hex << Event->NEW_CONNECTION.Connection << std::dec << "\n";
+        std::cout << getTimestamp() << " New connection handle: " << std::hex << Event->NEW_CONNECTION.Connection << std::dec << "\n";
 
-        // SAFE: Just set callbacks, NO THREADING
+        // CRITICAL: Set the connection callback FIRST
         std::cout << getTimestamp() << " Setting ServerConnectionCallback...\n";
         MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection, ServerConnectionCallback, nullptr);
+        std::cout << getTimestamp() << " ServerConnectionCallback set successfully\n";
 
+        // EXPERIMENTAL: Try to pre-register stream callbacks for expected stream IDs
+        std::cout << getTimestamp() << " === EXPERIMENTAL: PRE-REGISTERING STREAM CALLBACKS ===\n";
+
+        // Create a monitoring thread that will try to detect streams periodically
+        HQUIC connection = Event->NEW_CONNECTION.Connection;
+        std::thread([connection]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Wait for connection establishment
+
+            std::cout << getTimestamp() << " Starting periodic stream detection...\n";
+
+            for (int i = 0; i < 100; ++i) { // Try for 10 seconds
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                // Check connection statistics
+                QUIC_STATISTICS_V2 stats = {};
+                uint32_t statsSize = sizeof(stats);
+                if (QUIC_SUCCEEDED(MsQuic->GetParam(connection, QUIC_PARAM_CONN_STATISTICS_V2, &statsSize, &stats))) {
+                    if (stats.RecvTotalStreamBytes > 0) {
+                        std::cout << getTimestamp() << " *** DETECTED STREAM DATA WITHOUT EVENTS! ***\n";
+                        std::cout << getTimestamp() << " Received " << stats.RecvTotalStreamBytes << " stream bytes\n";
+                        std::cout << getTimestamp() << " But no PEER_STREAM_STARTED events fired\n";
+                        std::cout << getTimestamp() << " This confirms the bug: streams exist but events don't fire\n";
+                        break;
+                    }
+                }
+            }
+            }).detach();
+
+        // Set configuration AFTER callback
         std::cout << getTimestamp() << " Setting connection configuration...\n";
-        MsQuic->ConnectionSetConfiguration(Event->NEW_CONNECTION.Connection, Configuration);
+        QUIC_STATUS configStatus = MsQuic->ConnectionSetConfiguration(Event->NEW_CONNECTION.Connection, Configuration);
+        if (QUIC_FAILED(configStatus)) {
+            std::cout << getTimestamp() << " ERROR: ConnectionSetConfiguration failed: 0x" << std::hex << configStatus << std::dec << "\n";
+        }
+        else {
+            std::cout << getTimestamp() << " Connection configuration set successfully\n";
+        }
 
-        std::cout << getTimestamp() << " Connection configured safely\n";
+        std::cout << getTimestamp() << " Connection ready for PEER_STREAM_STARTED events\n";
+    }
+    else {
+        std::cout << getTimestamp() << " Other listener event: " << Event->Type << "\n";
     }
 
     std::cout << getTimestamp() << " === SERVER LISTENER CALLBACK END ===\n";

@@ -1,0 +1,132 @@
+@startuml 
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+
+title WebTransport Data Exchange Phase
+
+actor "Client App" as ClientApp
+participant "Client\nController" as ClientCtrl
+participant "QUIC\nConnection\n(Client)" as ClientConn
+participant "Client\nWT Stream" as ClientWTStream
+participant "Network" as Net
+participant "Server\nWT Stream" as ServerWTStream
+participant "QUIC\nConnection\n(Server)" as ServerConn
+participant "Server\nController" as ServerCtrl
+actor "Server App" as ServerApp
+
+== WebTransport Bidirectional Stream Creation ==
+
+note over ClientApp, ServerApp : WebTransport session established\nReady for application data exchange
+
+ClientApp -> ClientCtrl : Create WebTransport data stream
+note right : Application requests\nnew communication channel
+
+ClientCtrl -> ClientConn : StreamOpen(BIDIRECTIONAL)
+note right : Create new bidirectional stream\nfor WebTransport data
+
+ClientConn -> ClientWTStream : New stream (ID=4)
+activate ClientWTStream
+note right : **WebTransport Stream:**\nStream ID: 4 (next available)\nType: Bidirectional\nPurpose: Application data
+
+ClientWTStream -> ClientWTStream : StreamStart()
+note right : Start stream for\nWebTransport communication
+
+== Client Sends Application Data ==
+
+ClientApp -> ClientWTStream : Send application data
+note right : **Example Data:**\n"Hello WebTransport!\nTimestamp: 1234567890"
+
+ClientWTStream -> ClientWTStream : Prepare data
+note right : **Data Preparation:**\n- No HTTP/3 framing needed\n- Raw application data\n- Direct stream transmission
+
+ClientWTStream -> Net : Stream data
+note right : **Raw Application Data:**\nNo protocol overhead\nDirect WebTransport stream
+
+== Server Receives WebTransport Stream ==
+
+Net -> ServerConn : PEER_STREAM_STARTED (ID=4, BIDIRECTIONAL)
+note left : Server connection callback\nfor new WebTransport stream
+
+ServerConn -> ServerWTStream : Create WebTransport stream
+activate ServerWTStream
+note left : **Server WT Stream:**\nStream ID: 4\nType: WebTransport data\nAssociated with session
+
+ServerConn -> ServerWTStream : SetCallbackHandler()
+note left : Set stream callback for\nWebTransport data processing
+
+Net -> ServerWTStream : STREAM_EVENT_RECEIVE
+note left : Stream callback with\napplication data
+
+ServerWTStream -> ServerWTStream : Process WebTransport data
+note left : **Data Processing:**\n- No protocol parsing needed\n- Direct application data\n- Pass to application layer
+
+ServerWTStream -> ServerApp : Application data received
+note left : **Received Data:**\n"Hello WebTransport!\nTimestamp: 1234567890"
+
+== Server Sends Response Data ==
+
+ServerApp -> ServerWTStream : Send response data
+note left : **Response Data:**\n"Welcome to WebTransport!\nServer response: ACK"
+
+ServerWTStream -> Net : Stream response data
+note left : **Response Transmission:**\nDirect stream data\nNo protocol overhead
+
+== Client Receives Response ==
+
+Net -> ClientWTStream : STREAM_EVENT_RECEIVE
+note right : Client stream callback\nwith response data
+
+ClientWTStream -> ClientApp : Response data received
+note right : **Received Response:**\n"Welcome to WebTransport!\nServer response: ACK"
+
+== WebTransport Datagram Exchange ==
+
+ClientApp -> ClientConn : Send WebTransport datagram
+note right : **Unreliable Message:**\n"Quick status update"
+
+ClientConn -> Net : QUIC datagram
+note right : **QUIC Datagram:**\n- Unreliable delivery\n- Low latency\n- No retransmission
+
+Net -> ServerConn : CONNECTION_EVENT_DATAGRAM_RECEIVED
+note left : Connection callback for\nreceived datagram
+
+ServerConn -> ServerApp : Datagram received
+note left : **Datagram Data:**\n"Quick status update"
+
+== Server Datagram Response ==
+
+ServerApp -> ServerConn : Send response datagram
+note left : **Response Datagram:**\n"Status acknowledged"
+
+ServerConn -> Net : QUIC datagram
+note left : **QUIC Datagram:**\nUnreliable response
+
+Net -> ClientConn : CONNECTION_EVENT_DATAGRAM_RECEIVED
+note right : Client connection callback\nfor datagram
+
+ClientConn -> ClientApp : Response datagram received
+note right : **Response Received:**\n"Status acknowledged"
+
+== Multiple Stream Creation ==
+
+loop Additional WebTransport Streams
+    ClientApp -> ClientCtrl : Create additional streams
+    ClientCtrl -> ClientConn : StreamOpen() (ID=8, 12, 16...)
+    
+    note over ClientWTStream, ServerWTStream : **Multiple Concurrent Streams:**\n- Chat messages (Stream 4)\n- File transfer (Stream 8)\n- Control commands (Stream 12)\n- Status updates (Datagrams)
+    
+    ClientApp -> ClientWTStream : Send different data types
+    ServerWTStream -> ServerApp : Receive various applications
+end
+
+== Data Exchange Active ==
+
+note over ClientApp, ServerApp : **WebTransport Data Exchange Active**\nMultiple concurrent streams\nBidirectional communication\nReliable streams + unreliable datagrams
+
+note over ClientWTStream : **Client Stream Features:**\n- Multiple concurrent streams\n- Stream prioritization\n- Flow control\n- Reliable ordered delivery
+
+note over ServerWTStream : **Server Stream Features:**\n- Accept multiple streams\n- Process concurrent data\n- Manage session state\n- Handle backpressure
+
+@enduml
