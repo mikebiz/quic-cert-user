@@ -1,0 +1,103 @@
+﻿@startuml
+!theme plain
+skinparam state {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor darkblue
+}
+
+title QUIC/HTTP3/WebTransport State Transitions Overview
+
+state "QUIC Connection Layer" as ConnLayer #lightblue {
+  state IDLE
+  state CONNECTING  
+  state CONNECTED
+  state DRAINING
+  state CLOSED
+}
+
+state "QUIC Stream Layer" as StreamLayer #lightgreen {
+  state STREAM_IDLE
+  state STREAM_OPEN
+  state HALF_CLOSED_LOCAL
+  state HALF_CLOSED_REMOTE
+  state STREAM_CLOSED
+}
+
+state "HTTP/3 Protocol Layer" as H3Layer #lightcyan {
+  state H3_INIT
+  state H3_SETTINGS_PENDING
+  state H3_READY
+  state H3_ERROR
+}
+
+state "WebTransport Session Layer" as WTLayer #lightyellow {
+  state WT_INITIALIZING
+  state WT_CONNECTING
+  state WT_CONNECTED
+  state WT_CLOSING
+  state WT_CLOSED
+}
+
+' Cross-layer state dependencies with detailed annotations
+CONNECTED --> H3_INIT : **Enables HTTP/3**\nConnection ready for\nprotocol initialization
+note on link : **Reference: HTTP/3 Layer States**\nDetailed H3 state machine
+
+H3_READY --> WT_INITIALIZING : **Enables WebTransport**\nHTTP/3 settings exchanged\nWebTransport capability confirmed
+note on link : **Reference: WebTransport Session States**\nDetailed WT session management
+
+CONNECTED --> STREAM_IDLE : **Enables Streams**\nConnection ready for\nstream creation
+note on link : **Reference: QUIC Stream States**\nDetailed stream lifecycle
+
+H3_READY --> STREAM_IDLE : **HTTP/3 Streams**\nControl and request\nstreams creation
+note on link : **Cross-Reference**\nHTTP/3 uses QUIC streams\nfor control (ID 2/3) and\nrequest streams (ID 0,4,8...)
+
+WT_CONNECTED --> STREAM_IDLE : **WebTransport Streams**\nWebTransport data\nstreams creation  
+note on link : **Cross-Reference**\nWebTransport uses QUIC streams\nfor session data transport
+
+' Failure propagation paths
+DRAINING --> H3_ERROR : **Connection Shutdown**\nForces HTTP/3 termination
+DRAINING --> WT_CLOSING : **Session Termination**\nForces WebTransport closure  
+H3_ERROR --> WT_CLOSING : **Protocol Failure**\nHTTP/3 errors affect sessions
+
+' Layer interaction annotations
+note right of ConnLayer : **QUIC Connection States**\n→ **See: QUIC Connection State Diagram**\n\n**Key Features:**\n- RFC 9000 compliance\n- TLS 1.3 integration\n- Connection lifecycle management\n- Error handling and recovery
+
+note right of StreamLayer : **QUIC Stream States**\n→ **See: QUIC Stream State Diagram**\n\n**Key Features:**\n- Bidirectional/Unidirectional\n- Flow control enforcement\n- Stream multiplexing\n- Half-closed state handling
+
+note left of H3Layer : **HTTP/3 Layer States**\n→ **See: HTTP/3 Layer State Diagram**\n\n**Key Features:**\n- RFC 9114 compliance\n- SETTINGS frame exchange\n- QPACK configuration\n- WebTransport enablement
+
+note left of WTLayer : **WebTransport Session States**\n→ **See: WebTransport Session State Diagram**\n\n**Key Features:**\n- RFC 9220 compliance\n- CONNECT-based handshake\n- Session management\n- Stream/datagram multiplexing
+
+' Dependency flow annotations
+note top of ConnLayer : **Foundation Layer**\nProvides basic connectivity\nEnables all upper layers
+
+note top of StreamLayer : **Transport Abstraction**\nProvides reliable/unreliable delivery\nUsed by HTTP/3 and WebTransport
+
+note bottom of H3Layer : **Application Protocol**\nEnables WebTransport capability\nProvides HTTP semantics
+
+note bottom of WTLayer : **Session Protocol**\nApplication-level sessions\nDirect QUIC access
+
+' State machine relationships documentation
+note as RelationshipNote
+**State Machine Relationships**
+
+**Hierarchical Dependencies:**
+1. QUIC Connection (foundation)
+2. QUIC Streams (transport)  
+3. HTTP/3 Layer (protocol)
+4. WebTransport Sessions (application)
+
+**Cross-Layer Interactions:**
+- Connection state enables stream creation
+- HTTP/3 ready enables WebTransport
+- Session states manage stream allocation
+- Error propagation flows downward
+
+**Reference Documentation:**
+- Each layer has detailed state diagram
+- Cross-references maintain relationships
+- State transitions preserve original annotations
+- Error paths documented with recovery options
+end note
+@enduml

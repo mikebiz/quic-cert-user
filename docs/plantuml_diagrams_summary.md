@@ -249,6 +249,91 @@ The 6th diagram provides a **high-level overview** showing how all 5 layers conn
 [🔍 View SVG](svg/quic-http3-webtransport-state-transitions.svg)  
 [🧾 View Source (.puml)](diagrams/quic-http3-webtransport-state-transitions.puml)
 
+#### 1: QUIC Connection State
+
+**QUIC Connection States** (`quic_connection_states`)
+
+- Complete state machine: IDLE → CONNECTING → CONNECTED → DRAINING → CLOSED → ERROR
+- All original triggers preserved: ConnectionOpen(), CONNECTION_CONNECTED, etc.
+- Enhanced annotations: TLS handshake details, cleanup actions, error conditions
+- Cross-references: Points to dependent stream and protocol states
+
+![Diagram](images/discrete-state-quic-connection.png)
+
+[🔍 View SVG](svg/discrete-state-quic-connection.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-state-quic-connection.puml)
+
+#### 2: QUIC Stream Transitions
+
+**QUIC Stream States** (`quic_stream_states`)
+
+- Full stream lifecycle: IDLE → OPEN → HALF_CLOSED_* → CLOSED → ERROR
+- Bidirectional flow handling: Local and remote send directions
+- Unidirectional stream support: Direct transitions to half-closed states
+- Flow control annotations: Stream-level and connection-level controls
+- Stream ID management: Client/server stream ID patterns
+
+![Diagram](images/discrete-state-quic-streams-transitions.png)
+
+[🔍 View SVG](svg/discrete-state-quic-streams-transitions.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-state-quic-streams-transitions.puml)
+
+#### 3: HTTP/3 Layer State Transitions
+
+**HTTP/3 Layer States** (`http3_layer_states`)
+
+- Protocol initialization: INIT → SETTINGS_PENDING → READY → ERROR
+- Settings exchange details: ENABLE_WEBTRANSPORT, SETTINGS_H3_DATAGRAM
+- WebTransport enablement: Prerequisites for WebTransport sessions
+- QPACK configuration: Header compression setup
+- Error handling: Protocol violations and recovery
+
+![Diagram](images/discrete-state-http3-layer-transitions.png)
+
+[🔍 View SVG](svg/discrete-state-http3-layer-transitions.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-state-http3-layer-transitions.puml)
+
+#### 4: WebTransport Session State Transitions
+
+**WebTransport Session States** (`webtransport_session_states`)
+
+- Session lifecycle: INITIALIZING → CONNECTING → CONNECTED → CLOSING → CLOSED
+- CONNECT handshake: Detailed CONNECT request/response flow
+- Session capabilities: Stream/datagram management when connected
+- Graceful shutdown: CLOSE_WEBTRANSPORT_SESSION handling
+- Failure modes: 4xx/5xx response handling and error recovery
+
+![Diagram](images/discrete-state-webtransport-session-transitions.png)
+
+[🔍 View SVG](svg/discrete-state-webtransport-session-transitions.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-state-webtransport-session-transitions.puml)
+
+***Cross-Reference System***:
+
+Each diagram includes interface annotations that reference other diagrams:
+
+- **"Reference: [Diagram Name]"** notes that point to related state machines
+- **Dependency arrows** showing which states enable others
+- **Cross-layer interactions** clearly documented
+
+#### 5: Transitions Overview
+
+**Overview Diagram Features**:
+
+The **State Transitions Overview** provides:
+
+- **Simplified state** representations for each layer
+- **Cross-layer dependency arrows** with detailed annotations
+- **Reference notes** pointing to individual detailed diagrams
+- **Hierarchical relationship** explanation showing how layers depend on each other
+- **Error propagation paths** showing how failures cascade
+- **Layer characteristics** summary for each protocol layer
+
+![Diagram](images/discrete-state-transitions-overview.puml.png)
+
+[🔍 View SVG](svg/discrete-state-transitions-overview.puml.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-state-transitions-overview.puml)
+
 ### Diagram 4: Event Flow and Callbacks
 
 ![Diagram](images/msquic-event-flow-and-callback-triggers.png)

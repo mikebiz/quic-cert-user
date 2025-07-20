@@ -1,0 +1,60 @@
+﻿@startuml
+!theme plain
+skinparam state {
+  BackgroundColor lightcyan
+  BorderColor black
+  ArrowColor black
+}
+
+title HTTP/3 Layer State Transitions
+
+state "HTTP/3 Layer States" as HTTP3 {
+  state H3_INIT : HTTP/3 not initialized
+  state H3_SETTINGS_PENDING : Waiting for SETTINGS
+  state H3_READY : Ready for requests
+  state H3_ERROR : HTTP/3 error
+
+  [*] --> H3_INIT : Connection established
+  H3_INIT --> H3_SETTINGS_PENDING : Control stream created
+  H3_SETTINGS_PENDING --> H3_READY : SETTINGS exchanged
+  H3_SETTINGS_PENDING --> H3_ERROR : Invalid SETTINGS\nTimeout
+  H3_READY --> H3_ERROR : Protocol violation
+  H3_ERROR --> [*] : Connection closed
+}
+
+' HTTP/3 specific state annotations
+note right of H3_INIT : **Initialization Requirements:**\n- QUIC connection established\n- ALPN negotiated to "h3"\n- Ready for control stream setup
+
+note right of H3_SETTINGS_PENDING : **Settings Exchange Process:**\n- Control streams (ID 2/3) created\n- SETTINGS frames exchanged\n- WebTransport capability negotiated\n- QPACK parameters configured
+
+note right of H3_READY : **Ready State Capabilities:**\n→ **Reference: WebTransport Session States**\n- CONNECT requests accepted\n- REQUEST streams processed\n- Frame parsing active\n- QPACK encoding/decoding operational
+
+note left of H3_ERROR : **Error Conditions:**\n- Malformed frames\n- Invalid stream usage\n- QPACK errors\n- Settings violations\n- Unsupported features
+
+' Settings frame details
+note top of H3_SETTINGS_PENDING : **Critical SETTINGS for WebTransport:**\n- ENABLE_WEBTRANSPORT = 1\n- SETTINGS_H3_DATAGRAM = 1\n- MAX_FIELD_SECTION_SIZE\n- QPACK_MAX_TABLE_CAPACITY
+
+' Cross-layer dependencies
+note bottom of H3_INIT : **Dependency Reference:**\n→ **QUIC Connection States**\nRequires CONNECTED state\nbefore HTTP/3 initialization
+
+note bottom of H3_READY : **Enables References:**\n→ **QUIC Stream States**: Request/Control streams\n→ **WebTransport Session States**: CONNECT processing
+
+' Protocol compliance
+note left of HTTP3 : **HTTP/3 Protocol Features:**\n- RFC 9114 compliance\n- QPACK header compression\n- Stream multiplexing\n- Frame-based communication\n- Error code management
+
+' State-specific triggers
+note right of H3_SETTINGS_PENDING : **Settings Validation:**\n- Mandatory settings present\n- Compatible QPACK configuration\n- WebTransport support confirmed\n- Datagram support enabled
+
+' Additional transitions for edge cases
+H3_INIT --> H3_ERROR : Control stream\ncreation failure
+H3_READY --> H3_SETTINGS_PENDING : Settings\nrenegotiation
+
+note on link : **Renegotiation:**\nRare edge case\nTypically for parameter updates
+
+' Recovery mechanisms
+note bottom of H3_ERROR : **Error Recovery Options:**\n- Connection-level reset\n- Graceful degradation\n- Protocol downgrade\n- Connection termination
+
+' Stream management in H3_READY state
+note left of H3_READY : **Stream Management:**\n- Control streams operational\n- Request streams multiplexed\n- Frame processing active\n- Flow control enforced\n- GOAWAY handling ready
+
+@enduml

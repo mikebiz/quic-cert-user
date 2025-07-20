@@ -1,0 +1,59 @@
+﻿@startuml
+!theme plain
+skinparam state {
+  BackgroundColor lightblue
+  BorderColor black
+  ArrowColor black
+}
+
+title QUIC Connection State Transitions
+
+state "QUIC Connection States" as QUICConn {
+  state IDLE : Entry state
+  state CONNECTING : Handshake in progress
+  state CONNECTED : Ready for streams/datagrams
+  state DRAINING : Shutdown initiated
+  state CLOSED : Connection terminated
+  state ERROR : Error occurred
+
+  [*] --> IDLE : ConnectionOpen()
+  IDLE --> CONNECTING : ConnectionStart()\n[Client]
+  IDLE --> CONNECTING : NEW_CONNECTION\n[Server]
+  CONNECTING --> CONNECTED : CONNECTION_CONNECTED\n(TLS handshake complete)
+  CONNECTING --> ERROR : Handshake failure\nTimeout
+  CONNECTED --> DRAINING : ConnectionShutdown()\nPeer shutdown
+  CONNECTED --> ERROR : Protocol error\nTransport error
+  DRAINING --> CLOSED : SHUTDOWN_COMPLETE
+  ERROR --> CLOSED : Cleanup complete
+  CLOSED --> [*] : ConnectionClose()
+}
+
+' State-specific annotations preserved from original
+note right of CONNECTING : **Triggers:**\n- TLS handshake\n- Transport parameter exchange\n- Version negotiation
+
+note right of CONNECTED : **Triggers:**\n- Create streams\n- Send datagrams\n- Process peer streams
+
+note left of DRAINING : **Draining State Features:**\n- Graceful shutdown in progress\n- No new streams accepted\n- Existing streams finishing\n- CONNECTION_CLOSE sent/received
+
+note left of ERROR : **Error Conditions:**\n- Protocol violations\n- TLS handshake failures\n- Transport parameter conflicts\n- Version negotiation failures
+
+note left of CLOSED : **Cleanup Actions:**\n- All streams closed\n- Resources deallocated\n- Handles freed\n- Memory released
+
+' Cross-state dependencies and references
+note top of IDLE : **Initial State Dependencies:**\n- Registration must be created\n- Configuration must be loaded\n- Credentials must be available
+
+note bottom of CONNECTED : **Connected State Enables:**\n→ **Reference: QUIC Stream States**\n→ **Reference: HTTP/3 Layer States**\n→ **Reference: WebTransport Session States**
+
+' Protocol compliance notes
+note right of QUICConn : **QUIC Protocol Compliance:**\n- RFC 9000 state machine\n- Connection ID management\n- Flow control enforcement\n- Congestion control active
+
+' Error handling paths
+IDLE --> ERROR : Invalid configuration\nCredential failures
+DRAINING --> ERROR : Forced termination\nTimeout exceeded
+
+' Additional state annotations
+note left of IDLE : **Idle State Characteristics:**\n- Connection object created\n- No network activity\n- Configuration pending\n- Ready for start/accept
+
+note right of DRAINING : **Draining Timeout:**\n- Configurable duration\n- Default: 3x RTT\n- Ensures packet delivery\n- Prevents connection reuse
+
+@enduml

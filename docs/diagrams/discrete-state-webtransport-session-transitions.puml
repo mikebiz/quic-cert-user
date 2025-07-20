@@ -1,0 +1,69 @@
+﻿@startuml
+!theme plain
+skinparam state {
+  BackgroundColor lightyellow
+  BorderColor black
+  ArrowColor black
+}
+
+title WebTransport Session State Transitions
+
+state "WebTransport Session States" as WebTransport {
+  state WT_INITIALIZING : Session created
+  state WT_CONNECTING : CONNECT sent
+  state WT_CONNECTED : Session established
+  state WT_CLOSING : Shutdown initiated
+  state WT_CLOSED : Session terminated
+  state WT_FAILED : Connection failed
+
+  [*] --> WT_INITIALIZING : Session created
+  WT_INITIALIZING --> WT_CONNECTING : Send CONNECT\n[Client]
+  WT_INITIALIZING --> WT_CONNECTING : Receive CONNECT\n[Server]
+  WT_CONNECTING --> WT_CONNECTED : HTTP/3 200 OK\n[Client]\nSend 200 OK\n[Server]
+  WT_CONNECTING --> WT_FAILED : HTTP/3 4xx/5xx\nValidation failure
+  WT_CONNECTED --> WT_CLOSING : Session shutdown\nConnection closing
+  WT_CLOSING --> WT_CLOSED : Cleanup complete
+  WT_FAILED --> WT_CLOSED : Error handled
+  WT_CLOSED --> [*] : Session destroyed
+}
+
+' WebTransport session-specific annotations
+note right of WT_INITIALIZING : **Session Initialization:**\n- Session object created\n- Authority and path validated\n- CONNECT request prepared\n- Session ID allocated
+
+note right of WT_CONNECTING : **CONNECT Process:**\n- HEADERS frame with CONNECT method\n- :protocol: webtransport header\n- :authority: and :path: headers\n- Server validation in progress
+
+note right of WT_CONNECTED : **Connected State Capabilities:**\n→ **Reference: QUIC Stream States**\n- Create bidirectional streams\n- Create unidirectional streams\n- Send/receive datagrams\n- Stream multiplexing active\n- Flow control operational
+
+note left of WT_CLOSING : **Graceful Shutdown:**\n- CLOSE_WEBTRANSPORT_SESSION sent\n- Existing streams completing\n- Datagram transmission stopping\n- Resource cleanup beginning
+
+note left of WT_FAILED : **Failure Conditions:**\n- CONNECT request rejected\n- Authentication failures\n- Authorization denied\n- Protocol mismatches\n- Server unavailable
+
+note left of WT_CLOSED : **Session Cleanup:**\n- All streams closed\n- Resources deallocated\n- Session ID released\n- Memory freed
+
+' Cross-layer dependencies
+note top of WT_INITIALIZING : **Prerequisites Reference:**\n→ **HTTP/3 Layer States**: Must be H3_READY\n→ **QUIC Connection States**: Must be CONNECTED\n→ **QUIC Stream States**: Bidirectional stream available
+
+' Session management details
+note bottom of WT_CONNECTED : **Session Management:**\n- Multiple concurrent sessions supported\n- Session-level flow control\n- Stream association tracking\n- Datagram routing\n- Error propagation
+
+' Protocol-specific features
+note right of WebTransport : **WebTransport Features:**\n- RFC 9220 compliance\n- HTTP/3 CONNECT-based handshake\n- Stream and datagram multiplexing\n- Session isolation\n- Graceful degradation
+
+' CONNECT request validation
+note left of WT_CONNECTING : **CONNECT Validation:**\n- Method must be CONNECT\n- Protocol must be "webtransport"\n- Scheme must be "https"\n- Authority must be valid\n- Path authorization checked
+
+' Error handling and recovery
+WT_CONNECTED --> WT_FAILED : Session error\nStream failures
+WT_CLOSING --> WT_FAILED : Forced termination\nTimeout
+
+note on link : **Error Transitions:**\nUnexpected errors can\ntransition to FAILED state
+
+' Session capabilities in connected state
+note bottom of WT_CONNECTED : **Connected Capabilities:**\n- WebTransport streams: Reliable delivery\n- WebTransport datagrams: Unreliable delivery\n- Session-level flow control\n- Stream priority management\n- Error code propagation
+
+' Additional state information
+note top of WT_CONNECTING : **Server-Side Processing:**\n- CONNECT request received\n- Authority validation\n- Path authorization\n- Resource availability check\n- Response preparation (200/4xx/5xx)
+
+note bottom of WT_CLOSING : **Shutdown Coordination:**\n- Application-initiated shutdown\n- Connection-level shutdown\n- Stream completion waiting\n- Final acknowledgments\n- Resource cleanup
+
+@enduml
