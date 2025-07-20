@@ -1,0 +1,72 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightcyan
+  BorderColor black
+}
+
+title HTTP/3 Protocol Components
+
+package "HTTP/3 Protocol" {
+  component "HTTP/3 Frame Parser"    as H3Parser
+  component "QPACK Encoder/Decoder"  as QPACK
+  component "HTTP/3 Control Stream"  as H3Control
+  component "HTTP/3 Request Stream"  as H3Request
+  component "SETTINGS Frame"         as H3Settings
+  component "HEADERS Frame"          as H3Headers
+  component "DATA Frame"             as H3Data
+
+  H3Parser   --> QPACK       : uses
+  H3Control  --> H3Settings  : sends/receives
+  H3Request  --> H3Headers   : sends/receives
+  H3Request  --> H3Data      : sends/receives
+}
+
+' External interface points (references to other diagrams)
+interface "From Application Layer" as IFromApp
+interface "From WebTransport Protocol" as IFromWT
+interface "To MsQuic Layer" as IToMsQuic
+
+IFromApp --> H3Parser
+note on link : **Reference: Application Layer Diagram**\nReceives from HTTP/3 Application\nProvides HTTP/3 parsing services
+
+IFromWT --> H3Request
+note on link : **Reference: WebTransport Protocol Diagram**\nReceives WebTransport CONNECT requests\nHandles session establishment
+
+H3Control --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nMaps to unidirectional Stream\nStream ID 2/3 (client/server initiated)
+
+H3Request --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nMaps to bidirectional Stream\nStream ID 0, 4, 8... (bidirectional)
+
+H3Headers --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nTransmitted as frame data via Stream\nContains QPACK encoded headers
+
+H3Data --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nTransmitted as frame data via Stream\nContains application payload
+
+H3Settings --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nTransmitted as frame data via Stream\nContains connection settings
+
+' HTTP/3 specific annotations
+note right of H3Parser : **HTTP/3 Frame Parser:**\n- Varint decoding\n- Frame type identification\n- Payload extraction\n- Error handling
+
+note right of QPACK : **QPACK Features:**\n- Header compression\n- Static table references\n- Dynamic table management\n- Huffman encoding support
+
+note right of H3Control : **Control Stream Features:**\nStream ID 2/3\n(client/server initiated)\nCarries SETTINGS frames\nUnidirectional communication
+
+note right of H3Request : **Request Stream Features:**\nStream ID 0, 4, 8...\n(bidirectional)\nCarries HEADERS and DATA\nRequest/response pairs
+
+' Protocol layer annotations
+note top of H3Parser : **RFC 9114**\nHTTP/3
+
+' Frame type annotations
+note left of H3Settings : **SETTINGS Frame:**\n- ENABLE_WEBTRANSPORT\n- H3_DATAGRAM support\n- QPACK configuration\n- Stream limits
+
+note left of H3Headers : **HEADERS Frame:**\n- QPACK encoded headers\n- Request/response headers\n- WebTransport CONNECT\n- Status codes
+
+note left of H3Data : **DATA Frame:**\n- Application payload\n- Request/response body\n- Binary data support\n- Stream end markers
+
+@enduml

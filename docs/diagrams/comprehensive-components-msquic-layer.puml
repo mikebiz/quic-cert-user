@@ -1,0 +1,80 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightyellow
+  BorderColor black
+}
+
+title MsQuic Layer Components
+
+package "MsQuic Layer" {
+  component "Registration"   as Reg
+  component "Configuration"  as Config
+  component "Listener"       as Listener
+  component "Connection"     as Conn
+  component "Stream"         as Stream
+  component "Datagram"       as Datagram
+  component "TLS Context"    as TLS
+
+  Reg       --> Config    : creates
+  Reg       --> Listener  : creates
+  Reg       --> Conn      : creates
+  Config    --> Conn      : configures
+  Listener  --> Conn      : accepts
+  Conn      --> Stream    : creates
+  Conn      --> Datagram  : manages
+  Conn      --> TLS       : manages
+}
+
+' External interface points (references to other diagrams)
+interface "From HTTP/3 Protocol" as IFromH3
+interface "From WebTransport Protocol" as IFromWT
+interface "To Transport Layer" as IToTransport
+
+IFromH3 --> Stream
+note on link : **Reference: HTTP/3 Protocol Diagram**\nReceives HTTP/3 frames\nProvides reliable, ordered delivery
+
+IFromWT --> Stream
+note on link : **Reference: WebTransport Protocol Diagram**\nReceives WebTransport streams\nProvides stream multiplexing
+
+IFromWT --> Datagram
+note on link : **Reference: WebTransport Protocol Diagram**\nReceives WebTransport datagrams\nProvides unreliable delivery
+
+Conn --> IToTransport
+note on link : **Reference: Transport Layer Diagram**\nConnects to UDP Socket\nProvides QUIC connection management
+
+Datagram --> IToTransport
+note on link : **Reference: Transport Layer Diagram**\nTransmits via UDP packets\nProvides datagram encapsulation
+
+Stream --> IToTransport
+note on link : **Reference: Transport Layer Diagram**\nTransmits via UDP packets\nProvides stream data encapsulation
+
+' MsQuic specific annotations
+note right of Reg : **Registration Features:**\n- Process-level context\n- Execution profiles\n- Thread management\n- Global settings
+
+note right of Config : **Configuration Features:**\n- ALPN protocols (h3)\n- TLS credentials\n- Stream limits\n- Flow control settings
+
+note right of Listener : **Listener Features:**\n- Server-side acceptor\n- Port binding\n- Connection acceptance\n- Callback management
+
+note right of Conn : **Connection Features:**\n- QUIC state machine\n- Multiplexed streams\n- Flow control\n- Congestion control
+
+note right of Stream : **Stream Features:**\nReliable, ordered\ndelivery\nBidirectional/Unidirectional\nFlow control
+
+note right of Datagram : **Datagram Features:**\nUnreliable,\nunordered delivery\nLow latency\nNo retransmission
+
+note right of TLS : **TLS Context Features:**\n- TLS 1.3 integration\n- Certificate management\n- Key derivation\n- Encryption/decryption
+
+' Protocol layer annotations
+note top of Conn : **RFC 9000**\nQUIC Transport
+note top of TLS : **RFC 8446**\nTLS 1.3
+
+' State dependencies
+note left of Config : **Configuration Dependencies:**\nMust load credentials\nbefore connection use
+
+note left of Listener : **Listener Dependencies:**\nMust set configuration\nfor accepted connections
+
+note left of Stream : **Stream Dependencies:**\nMust set callback\nand enable receive
+
+@enduml

@@ -1,0 +1,39 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightblue
+  BorderColor black
+}
+
+title Application Layer Components
+
+package "Application Layer" {
+  component "WebTransport Application" as WTApp
+  component "HTTP/3 Application"      as H3App
+}
+
+' Internal connections within Application Layer
+WTApp --> H3App : may coexist
+
+' External interface points (references to other diagrams)
+interface "To WebTransport Protocol" as IWT
+interface "To HTTP/3 Protocol" as IH3
+
+WTApp --> IWT
+note on link : **Reference: WebTransport Protocol Diagram**\nConnects to WebTransport Session\nProvides application-level API
+
+H3App --> IH3
+note on link : **Reference: HTTP/3 Protocol Diagram**\nConnects to HTTP/3 Frame Parser\nProvides HTTP/3 application interface
+
+' Application layer annotations
+note right of WTApp : **WebTransport Application Features:**\n- Real-time communication\n- Gaming applications\n- Live streaming\n- Low-latency messaging\n- Bidirectional data exchange
+
+note right of H3App : **HTTP/3 Application Features:**\n- Traditional web requests\n- REST API clients\n- Web browsers\n- HTTP-based services
+
+' Protocol layer reference
+note bottom of IWT : **External Reference:**\nSee "WebTransport Protocol Diagram"\nfor WebTransport Session component
+note bottom of IH3 : **External Reference:**\nSee "HTTP/3 Protocol Diagram"\nfor HTTP/3 Frame Parser component
+
+@enduml

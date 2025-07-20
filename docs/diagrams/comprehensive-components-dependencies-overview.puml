@@ -1,0 +1,88 @@
+@startuml
+!theme plain
+skinparam packageStyle rectangle
+skinparam backgroundColor white
+
+title QUIC/HTTP3/WebTransport Component Dependencies Overview
+
+package "Application Layer" #lightblue {
+  [WebTransport Application]
+  [HTTP/3 Application]
+}
+
+package "WebTransport Protocol" #lightgreen {
+  [WebTransport Session]
+  [WebTransport Streams]
+  [WebTransport Datagrams]
+}
+
+package "HTTP/3 Protocol" #lightcyan {
+  [HTTP/3 Frame Parser]
+  [QPACK Encoder/Decoder]
+  [HTTP/3 Control Stream]
+  [HTTP/3 Request Stream]
+}
+
+package "MsQuic Layer" #lightyellow {
+  [Registration]
+  [Configuration]
+  [Connection]
+  [Stream]
+  [Datagram]
+  [TLS Context]
+}
+
+package "Transport Layer" #lightpink {
+  [UDP Socket]
+  [Network Interface]
+}
+
+' Cross-layer dependencies with detailed annotations
+[WebTransport Application] --> [WebTransport Session] : **uses**\nAPI calls for session management
+[HTTP/3 Application] --> [HTTP/3 Frame Parser] : **uses**\nHTTP/3 request/response processing
+
+[WebTransport Session] --> [HTTP/3 Request Stream] : **CONNECT request**\nWebTransport handshake
+[WebTransport Streams] --> [Stream] : **maps to**\nReliable data transport
+[WebTransport Datagrams] --> [Datagram] : **maps to**\nUnreliable data transport
+
+[HTTP/3 Control Stream] --> [Stream] : **unidirectional**\nStream ID 2/3
+[HTTP/3 Request Stream] --> [Stream] : **bidirectional**\nStream ID 0, 4, 8...
+
+[Connection] --> [UDP Socket] : **sends/receives**\nQUIC packets
+[Stream] --> [UDP Socket] : **encapsulated in**\nQUIC connection packets
+[Datagram] --> [UDP Socket] : **sends/receives**\nQUIC datagram frames
+
+[UDP Socket] --> [Network Interface] : **transmits via**\nPhysical network
+
+' Reference annotations for individual diagrams
+note right of [WebTransport Application] : **See: Application Layer Diagram**\nDetailed application components\nand interfaces
+
+note right of [WebTransport Session] : **See: WebTransport Protocol Diagram**\nSession management and\nstream/datagram handling
+
+note right of [HTTP/3 Frame Parser] : **See: HTTP/3 Protocol Diagram**\nFrame parsing, QPACK,\nand stream management
+
+note right of [Connection] : **See: MsQuic Layer Diagram**\nMsQuic API components\nand object relationships
+
+note right of [UDP Socket] : **See: Transport Layer Diagram**\nUDP and network interface\ndetails
+
+' Protocol specifications
+note top of "WebTransport Protocol" : **RFC 9220**\nWebTransport over HTTP/3
+
+note top of "HTTP/3 Protocol" : **RFC 9114**\nHTTP/3
+
+note top of "MsQuic Layer" : **RFC 9000**\nQUIC Transport
+
+note top of "Transport Layer" : **RFC 768**\nUser Datagram Protocol
+
+' Architecture notes
+note left of "Application Layer" : **Application Interface**\nDeveloper-facing APIs\nBusiness logic layer
+
+note left of "WebTransport Protocol" : **Session Layer**\nWebTransport-specific\nprotocol handling
+
+note left of "HTTP/3 Protocol" : **Application Protocol**\nHTTP/3 frame processing\nHeader compression
+
+note left of "MsQuic Layer" : **Transport Implementation**\nQUIC protocol stack\nMicrosoft's implementation
+
+note left of "Transport Layer" : **Network Layer**\nUDP packet transmission\nPhysical network access
+
+@enduml

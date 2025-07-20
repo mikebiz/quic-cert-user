@@ -119,6 +119,73 @@ INITIALIZING → CONNECTING → CONNECTED → CLOSING → CLOSED
 [🔍 View SVG](svg/quic-http3-webtransport-component_dependencies.svg)  
 [🧾 View Source (.puml)](diagrams/quic-http3-webtransport-component_dependencies.puml)
 
+#### 1: Application Layer Components
+
+Shows WebTransport and HTTP/3 applications
+
+![Diagram](images/comprehensive-components-application-layer.png)
+
+[🔍 View SVG](svg/comprehensive-components-application-layer.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-application-layer.puml)
+
+#### 2: WebTransport Protocol Components
+
+Shows session, streams, and datagrams management
+
+![Diagram](images/comprehensive-components-webtransport-protocols.png)
+
+[🔍 View SVG](svg/comprehensive-components-webtransport-protocols.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-webtransport-protocols.puml)
+
+#### 3: HTTP/3 Protocol Components
+
+Shows frame parsing, QPACK, and stream types
+
+![Diagram](images/comprehensive-components-http3-protocols.png)
+
+[🔍 View SVG](svg/comprehensive-components-http3-protocols.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-http3-protocols.puml)
+
+#### 4: MsQuic Layer Components
+
+Shows all MsQuic API objects and relationships
+
+![Diagram](images/comprehensive-components-msquic-layer.png)
+
+[🔍 View SVG](svg/comprehensive-components-msquic-layer.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-msquic-layer.puml)
+
+#### 5: Transport Layer Components
+
+Shows UDP and network interface details
+
+![Diagram](images/comprehensive-components-transport-layer.png)
+
+[🔍 View SVG](svg/comprehensive-components-transport-layer.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-transport-layer.puml)
+
+**Cross-Diagram Reference System**:
+
+Each diagram uses interface elements with clear annotations to reference connections to other diagrams:
+
+- **Interface Points**: interface "To/From [Layer] [Diagram]" elements
+- **Reference Notes**: Clear annotations like "Reference: WebTransport Protocol Diagram"
+- **Connection Descriptions**: Detailed notes explaining what data flows between layers
+
+#### 6: Overview Diagram
+
+The 6th diagram provides a **high-level overview** showing how all 5 layers connect, with:
+
+- **Simplified boxes** representing each layer
+- **Cross-layer connections** with detailed annotations
+- **Reference notes** pointing to individual detailed diagrams
+- **Protocol specifications** (RFC numbers) for each layer
+
+![Diagram](images/comprehensive-components-dependencies-overview.png)
+
+[🔍 View SVG](svg/comprehensive-components-dependencies-overview.svg)  
+[🧾 View Source (.puml)](diagrams/comprehensive-components-dependencies-overview.puml)
+
 ### Diagram 2: WebTransport Sequence
 
 ![Diagram](images/webtransport-over-quic-http3-complete-sequence.png)

@@ -1,0 +1,51 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightgreen
+  BorderColor black
+}
+
+title WebTransport Protocol Components
+
+package "WebTransport Protocol" {
+  component "WebTransport Session"   as WTSession
+  component "WebTransport Streams"   as WTStreams
+  component "WebTransport Datagrams" as WTDatagrams
+
+  WTSession --> WTStreams   : manages
+  WTSession --> WTDatagrams : manages
+}
+
+' External interface points (references to other diagrams)
+interface "From Application Layer" as IFromApp
+interface "To HTTP/3 Protocol" as IToH3
+interface "To MsQuic Layer" as IToMsQuic
+
+IFromApp --> WTSession
+note on link : **Reference: Application Layer Diagram**\nReceives from WebTransport Application\nProvides session management API
+
+WTSession --> IToH3
+note on link : **Reference: HTTP/3 Protocol Diagram**\nConnects to HTTP/3 Request Stream\nSends CONNECT requests
+
+WTStreams --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nMaps to QUIC Stream component\nProvides reliable data transport
+
+WTDatagrams --> IToMsQuic
+note on link : **Reference: MsQuic Layer Diagram**\nMaps to QUIC Datagram component\nProvides unreliable data transport
+
+' WebTransport specific annotations
+note right of WTSession : **WebTransport Session Features:**\n- Session establishment via CONNECT\n- Session state management\n- Multiple concurrent sessions\n- Session-level flow control
+
+note right of WTStreams : **WebTransport Streams:**\n- Bidirectional streams\n- Unidirectional streams\n- Stream multiplexing\n- Reliable, ordered delivery
+
+note right of WTDatagrams : **WebTransport Datagrams:**\n- Unreliable delivery\n- Low latency\n- Out-of-order delivery\n- Gaming/real-time use cases
+
+' Protocol layer annotations
+note top of WTSession : **RFC 9220**\nWebTransport over HTTP/3
+
+' State dependencies
+note left of WTSession : **Session Dependencies:**\n- Requires HTTP/3 200 OK\n- CONNECT request success\n- WebTransport capability negotiated
+
+@enduml

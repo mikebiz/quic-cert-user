@@ -1,0 +1,41 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor lightpink
+  BorderColor black
+}
+
+title Transport Layer Components
+
+package "Transport Layer" {
+  component "UDP Socket"        as UDP
+  component "Network Interface" as NetIf
+
+  UDP --> NetIf : uses
+}
+
+' External interface points (references to other diagrams)
+interface "From MsQuic Layer" as IFromMsQuic
+
+IFromMsQuic --> UDP
+note on link : **Reference: MsQuic Layer Diagram**\nReceives from Connection, Stream, Datagram\nProvides network packet transmission
+
+' Transport layer annotations
+note right of UDP : **UDP Features:**\n- Connectionless protocol\n- Low overhead headers\n- No reliability guarantees\n- Fast transmission\n- 64-bit header only
+
+note right of NetIf : **Network Interface Features:**\n- Physical network access\n- Packet routing\n- Network address management\n- MTU handling
+
+' Protocol details
+note top of UDP : **UDP Protocol Stack:**\n- Source/Destination ports\n- Packet length\n- Checksum validation\n- Datagram encapsulation
+
+' Network characteristics
+note left of UDP : **UDP Characteristics:**\n- Connectionless nature\n- Independent packet routing\n- No loss detection\n- Out-of-order delivery\n- Minimal protocol overhead
+
+note left of NetIf : **Network Interface:**\n- Ethernet/WiFi/Cellular\n- IP address management\n- Routing table access\n- Physical transmission
+
+' Performance notes
+note bottom of UDP : **Performance Benefits:**\n- No connection establishment\n- No acknowledgment overhead\n- Optimal path selection\n- Reduced latency\n- Efficient for real-time data
+
+@enduml
