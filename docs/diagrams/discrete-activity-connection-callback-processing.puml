@@ -1,0 +1,302 @@
+@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightcyan
+  BorderColor black
+  ArrowColor black
+}
+
+title Connection Callback Processing
+
+start
+
+partition "**Callback Invocation**" {
+  :Receive event from MsQuic Core;
+  note right
+  **Reference: MsQuic Core Diagram**
+  Connection events queued by
+  MsQuic core processing
+  end note
+
+  :Invoke CONNECTION_CALLBACK;
+  note right
+  **Callback Signature:**
+  QUIC_STATUS QUIC_API CONNECTION_CALLBACK(
+    HQUIC Connection,
+    void* Context,
+    QUIC_CONNECTION_EVENT* Event)
+  end note
+
+  :Determine Event Type;
+  note right
+  **Connection Event Types:**
+  - CONNECTED (0)
+  - SHUTDOWN_INITIATED_BY_TRANSPORT (1)
+  - SHUTDOWN_INITIATED_BY_PEER (2)
+  - SHUTDOWN_COMPLETE (3)
+  - PEER_STREAM_STARTED (6)
+  - DATAGRAM_RECEIVED (11)
+  - And 10+ other event types
+  end note
+}
+
+partition "**Event Type Routing**" {
+  if (Event Type?) then (Route to Processing)
+    :Route to appropriate processor;
+  else (Unknown Event)
+    :Log unknown event and continue;
+  endif
+}
+
+partition "**CONNECTED Processing**" {
+  :Extract Connection Info;
+  note right
+  **CONNECTED Event Data:**
+  - SessionResumed flag
+  - NegotiatedAlpnLength
+  - NegotiatedAlpn protocol
+  - Connection ready for streams
+  end note
+  
+  :Setup Application State;
+  note right
+  **Application Setup:**
+  - Initialize connection tracking
+  - Prepare stream management
+  - Setup data buffers
+  - Configure flow control
+  end note
+  
+  :Create Initial Streams (Optional);
+  note right
+  **Stream Creation:**
+  - HTTP/3 control streams
+  - WebTransport CONNECT streams
+  - Application data streams
+  - Server test streams
+  end note
+}
+
+partition "**PEER_STREAM_STARTED Processing**" {
+  :Extract Stream Info;
+  note right
+  **PEER_STREAM_STARTED Data:**
+  - Stream handle
+  - QUIC_STREAM_OPEN_FLAGS
+  - Stream type (uni/bidirectional)
+  - 0-RTT flag if applicable
+  end note
+  
+  :Set Stream Callback;
+  note right
+  **SetCallbackHandler():**
+  - Assign stream callback function
+  - Set stream context
+  - Enable stream event processing
+  end note
+  
+  if (Stream Type?) then (Unidirectional)
+    :Process Unidirectional Stream;
+    note right
+    **Unidirectional Streams:**
+    - No StreamReceiveSetEnabled needed
+    - Automatic receive events
+    - Control streams (HTTP/3)
+    - One-way data streams
+    end note
+    
+  else (Bidirectional)
+    :Enable Stream Receive;
+    note right
+    **StreamReceiveSetEnabled(TRUE):**
+    - Enable RECEIVE events
+    - Required for bidirectional streams
+    - Data streams, request streams
+    - WebTransport streams
+    end note
+    
+    :Start Stream (Optional);
+    note right
+    **StreamStart():**
+    - Force immediate stream start
+    - Ensure stream is ready
+    - Some implementations require this
+    end note
+  endif
+}
+
+partition "**DATAGRAM_RECEIVED Processing**" {
+  :Extract Datagram Data;
+  note right
+  **DATAGRAM_RECEIVED Data:**
+  - Buffer pointer and length
+  - QUIC_RECEIVE_FLAGS
+  - 0-RTT flag if applicable
+  - Unreliable delivery
+  end note
+  
+  :Process Application Datagram;
+  note right
+  **Datagram Processing:**
+  - WebTransport datagrams
+  - Game state updates
+  - Real-time communications
+  - Low-latency messaging
+  end note
+  
+  :No Acknowledgment Required;
+  note right
+  **Datagram Characteristics:**
+  - Fire-and-forget delivery
+  - No flow control
+  - No retransmission
+  - Order not guaranteed
+  end note
+}
+
+partition "**TRANSPORT_SHUTDOWN Processing**" {
+  :Extract Shutdown Info;
+  note right
+  **SHUTDOWN_INITIATED_BY_TRANSPORT:**
+  - QUIC_STATUS (reason)
+  - QUIC_UINT62 ErrorCode
+  - Protocol-level shutdown
+  - Transport errors
+  end note
+  
+  :Handle Transport Error;
+  note right
+  **Transport Error Handling:**
+  - Log error details
+  - Clean up application state
+  - Notify application layers
+  - Prepare for closure
+  end note
+}
+
+partition "**PEER_SHUTDOWN Processing**" {
+  :Extract Peer Shutdown;
+  note right
+  **SHUTDOWN_INITIATED_BY_PEER:**
+  - QUIC_UINT62 ErrorCode
+  - Application-level shutdown
+  - Graceful termination
+  - Peer-initiated close
+  end note
+  
+  :Handle Graceful Shutdown;
+  note right
+  **Graceful Shutdown:**
+  - Complete pending operations
+  - Close streams gracefully
+  - Send final data
+  - Acknowledge shutdown
+  end note
+}
+
+partition "**SHUTDOWN_COMPLETE Processing**" {
+  :Extract Completion Info;
+  note right
+  **SHUTDOWN_COMPLETE Data:**
+  - HandshakeCompleted flag
+  - PeerAcknowledgedShutdown flag
+  - AppCloseInProgress flag
+  - Final cleanup trigger
+  end note
+  
+  :Cleanup Connection Resources;
+  note right
+  **Resource Cleanup:**
+  - Close all streams
+  - Free connection context
+  - Update connection tracking
+  - Release memory
+  end note
+  
+  :Close Connection Handle;
+  note right
+  **ConnectionClose():**
+  - REQUIRED action
+  - Frees MsQuic resources
+  - Must be called in this event
+  - Connection handle invalid after
+  end note
+}
+
+partition "**Other Event Processing**" {
+  :Process Other Events;
+  note right
+  **Other Connection Events:**
+  - STREAMS_AVAILABLE
+  - LOCAL_ADDRESS_CHANGED
+  - PEER_ADDRESS_CHANGED
+  - IDEAL_PROCESSOR_CHANGED
+  - RESUMPTION_TICKET_RECEIVED
+  - And more...
+  end note
+  
+  :Update Connection State;
+  note right
+  **State Updates:**
+  - Flow control updates
+  - Address changes
+  - Performance hints
+  - Session tickets
+  end note
+}
+
+partition "**Error Handling**" {
+  if (Callback Error?) then (yes)
+    :Handle Connection Error;
+    note right
+    **Error Recovery:**
+    - Log error details
+    - Clean up partial state
+    - Shutdown connection if needed
+    - Prevent resource leaks
+    end note
+    
+    :Return Error Status;
+    note right
+    **Error Codes:**
+    - QUIC_STATUS_INTERNAL_ERROR
+    - QUIC_STATUS_OUT_OF_MEMORY
+    - Application-specific errors
+    end note
+  else (no)
+    :Return QUIC_STATUS_SUCCESS;
+    note right
+    **Successful Processing:**
+    Event processed successfully
+    Continue normal operation
+    end note
+  endif
+}
+
+:Return to Application Layer;
+note right
+**Reference: Application Layer Diagram**
+Callback return value processed
+by application layer
+end note
+
+stop
+
+note left
+**Connection Callback Features:**
+- Connection lifecycle management
+- Stream creation handling
+- Datagram processing
+- Error and shutdown handling
+- State synchronization
+end note
+
+note right
+**Performance Notes:**
+- Called on MsQuic worker threads
+- Should return quickly
+- Heavy processing should be deferred
+- Stream callbacks are critical path
+- Blocking affects connection performance
+end note
+@enduml

@@ -1,0 +1,170 @@
+﻿@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightblue
+  BorderColor black
+  ArrowColor black
+}
+
+title Application Layer Event Flow
+
+start
+
+partition "**Application Layer**" {
+  :Application calls MsQuic API;
+  note right
+  **API Calls Examples:**
+  - RegistrationOpen()
+  - ConfigurationOpen()
+  - ConnectionOpen()
+  - StreamOpen()
+  - StreamSend()
+  - StreamReceiveComplete()
+  end note
+
+  partition "API Categories" {
+    split
+      :RegistrationOpen();
+      note right
+      **Registration APIs:**
+      - Process-level context
+      - Execution profiles
+      - Global settings
+      end note
+    split again
+      :ConfigurationOpen()
+      ConfigurationLoadCredential();
+      note right
+      **Configuration APIs:**
+      - ALPN protocols
+      - TLS credentials
+      - Stream settings
+      - Flow control
+      end note
+    split again
+      :ConnectionOpen()
+      ConnectionStart();
+      note right
+      **Connection APIs:**
+      - Client connection initiation
+      - Server connection acceptance
+      - Connection configuration
+      end note
+    split again
+      :StreamOpen()
+      StreamStart()
+      StreamSend();
+      note right
+      **Stream APIs:**
+      - Bidirectional/Unidirectional
+      - Data transmission
+      - Flow control management
+      end note
+    split again
+      :ListenerOpen()
+      ListenerStart();
+      note right
+      **Listener APIs:**
+      - Server-side listening
+      - Connection acceptance
+      - Port binding
+      end note
+    end split
+  }
+
+  :Process API call in MsQuic Core;
+  note right
+  **Reference: MsQuic Core**
+  API calls are processed by
+  MsQuic internal state machine
+  end note
+}
+
+partition "**Callback Processing**" {
+  if (Callback received?) then (yes)
+    partition "Event Processing" {
+      split
+        :Process Listener Events;
+        note right
+        **Listener Events:**
+        - NEW_CONNECTION
+        - STOP_COMPLETE
+        end note
+      split again
+        :Process Connection Events;
+        note right
+        **Connection Events:**
+        - CONNECTED
+        - PEER_STREAM_STARTED
+        - SHUTDOWN_COMPLETE
+        end note
+      split again
+        :Process Stream Events;
+        note right
+        **Stream Events:**
+        - RECEIVE
+        - SEND_COMPLETE
+        - SHUTDOWN_COMPLETE
+        end note
+      end split
+    }
+    
+    :Update Application State;
+    note right
+    **Application State Updates:**
+    - Connection tracking
+    - Stream management
+    - Data buffering
+    - Error handling
+    end note
+    
+    :Return Status to MsQuic;
+    note right
+    **Return Values:**
+    - QUIC_STATUS_SUCCESS
+    - QUIC_STATUS_PENDING
+    - Error codes for failures
+    end note
+
+  else (no)
+    :Continue Application Logic;
+  endif
+}
+
+partition "**Error Handling**" {
+  if (Error in application?) then (yes)
+    :Handle Application Error;
+    note right
+    **Application Error Handling:**
+    - Cleanup resources
+    - Notify user/system
+    - Graceful degradation
+    - Retry logic
+    end note
+    
+    :Cleanup Resources;
+    note right
+    **Cleanup Actions:**
+    - Close streams
+    - Close connections
+    - Close listeners
+    - Free configurations
+    - Close registration
+    end note
+
+  else (no)
+    :Normal Operation;
+  endif
+}
+
+stop
+
+note left
+**Application Layer Characteristics:**
+- User/developer provided code
+- Business logic implementation
+- Resource management
+- Error handling
+- State tracking
+end note
+@enduml

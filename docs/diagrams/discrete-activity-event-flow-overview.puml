@@ -1,0 +1,84 @@
+﻿@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor darkblue
+}
+
+title MsQuic Event Flow Overview
+
+package "Application Layer" #lightblue {
+  [Application API Calls]
+  [Application State Management]
+  [Error Handling]
+}
+
+package "MsQuic Core" #lightyellow {
+  [API Processing]
+  [State Machine Updates]
+  [Event Generation]
+  [Network I/O]
+}
+
+package "Callback Processing" #lightgreen {
+  [Listener Callbacks]
+  [Connection Callbacks]
+  [Stream Callbacks]
+}
+
+' Main flow arrows with detailed annotations
+[Application API Calls] --> [API Processing] : **API Invocation**\nMsQuic API calls trigger\ninternal processing
+note on link : **Reference: Application Layer Diagram**\nDetailed application API usage
+
+[API Processing] --> [State Machine Updates] : **Internal Processing**\nValidate, update state,\nmanage resources
+note on link : **Reference: MsQuic Core Diagram**\nDetailed core processing
+
+[State Machine Updates] --> [Event Generation] : **Event Triggers**\nState changes generate\ncallback events
+note on link : **Event Types:**\n- Network events\n- Timer events\n- State changes\n- Error conditions
+
+[Event Generation] --> [Listener Callbacks] : **Listener Events**\nNEW_CONNECTION\nSTOP_COMPLETE
+note on link : **Reference: Listener Callback Diagram**\nDetailed listener processing
+
+[Event Generation] --> [Connection Callbacks] : **Connection Events**\nCONNECTED, PEER_STREAM_STARTED\nSHUTDOWN events, DATAGRAM_RECEIVED
+note on link : **Reference: Connection Callback Diagram**\nDetailed connection processing
+
+[Event Generation] --> [Stream Callbacks] : **Stream Events**\nRECEIVE, SEND_COMPLETE\nSHUTDOWN_COMPLETE
+note on link : **Reference: Stream Callback Diagram**\nDetailed stream processing
+
+' Return paths
+[Listener Callbacks] --> [Application State Management] : **Callback Returns**\nProcess listener results\nUpdate connection tracking
+note on link : **Return Processing:**\nSUCCESS/ERROR status\naffects MsQuic behavior
+
+[Connection Callbacks] --> [Application State Management] : **Connection Results**\nProcess connection events\nManage connection state
+note on link : **Critical Actions:**\nSome events require\nspecific API calls
+
+[Stream Callbacks] --> [Application State Management] : **Stream Results**\nProcess stream data\nManage flow control
+note on link : **Flow Control:**\nStreamReceiveComplete()\nis mandatory
+
+[Application State Management] --> [Error Handling] : **Error Conditions**\nHandle callback errors\nManage resource cleanup
+
+' External event sources
+[Network I/O] --> [Event Generation] : **Network Events**\nPacket reception\nConnection events\nTimeout events
+note on link : **External Triggers:**\n- UDP packet reception\n- Timer expiration\n- System events\n- Resource changes
+
+' Event trigger sources
+note right of [Event Generation] : **Event Trigger Sources**\n\n**Network Events:**\n- Packet received\n- Packet lost\n- Connection timeout\n- Address change\n\n**API Events:**\n- ConnectionStart()\n- StreamOpen()\n- StreamSend()\n- StreamShutdown()\n\n**Timer Events:**\n- Idle timeout\n- Retransmission\n- Keep-alive\n- Handshake timeout\n\n**State Events:**\n- Flow control updates\n- Stream limits\n- Connection limits\n- Error conditions
+
+' Callback processing details
+note left of [Listener Callbacks] : **Listener Callback Details**\n→ **See: Listener Callback Diagram**\n\n**Key Events:**\n- NEW_CONNECTION: Accept/reject\n- STOP_COMPLETE: Cleanup\n\n**Critical Actions:**\n- SetCallbackHandler()\n- ConnectionSetConfiguration()\n- Return appropriate status
+
+note left of [Connection Callbacks] : **Connection Callback Details**\n→ **See: Connection Callback Diagram**\n\n**Key Events:**\n- CONNECTED: Setup streams\n- PEER_STREAM_STARTED: Accept streams\n- SHUTDOWN_COMPLETE: Cleanup\n\n**Critical Actions:**\n- Set stream callbacks\n- Enable stream receive\n- Call ConnectionClose()
+
+note left of [Stream Callbacks] : **Stream Callback Details**\n→ **See: Stream Callback Diagram**\n\n**Key Events:**\n- RECEIVE: Process data\n- SEND_COMPLETE: Continue sending\n- SHUTDOWN_COMPLETE: Cleanup\n\n**Critical Actions:**\n- StreamReceiveComplete()\n- StreamClose()\n- Proper flow control
+
+' Performance and threading notes
+note bottom of [MsQuic Core] : **Performance Characteristics**\n\n**Threading Model:**\n- Callbacks on MsQuic worker threads\n- Should return quickly\n- Heavy processing should be deferred\n- Thread safety is application responsibility\n\n**Critical Path Operations:**\n- RECEIVE events (high frequency)\n- SEND_COMPLETE events\n- Flow control management\n- Error handling
+
+' State dependencies
+note top of [Application API Calls] : **API Dependencies**\n\n**Required Order:**\n1. RegistrationOpen()\n2. ConfigurationOpen()\n3. ConfigurationLoadCredential()\n4. ListenerOpen() OR ConnectionOpen()\n5. StreamOpen() (after CONNECTED)\n\n**Cleanup Order:**\n1. StreamClose() (all streams)\n2. ConnectionClose() (all connections)\n3. ListenerClose()\n4. ConfigurationClose()\n5. RegistrationClose()
+
+' Error handling paths
+note right of [Error Handling] : **Error Handling Strategy**\n\n**Error Propagation:**\n- Callback errors affect MsQuic behavior\n- SUCCESS continues normal operation\n- ERROR codes trigger cleanup\n- PENDING indicates async operation\n\n**Resource Management:**\n- Failed operations must clean up\n- Partial state must be handled\n- Memory leaks must be prevented\n- Handles must be properly closed
+
+@enduml

@@ -341,6 +341,100 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/msquic-event-flow-and-callback-triggers.svg)  
 [🧾 View Source (.puml)](diagrams/msquic-event-flow-and-callback-triggers.puml)
 
+#### 1: Application Layer Event Flow
+
+**Application Layer Event Flow (`application_layer_flow`)**
+
+- **API Categories**: Registration, Configuration, Connection, Stream, Listener APIs
+- **Application Responsibilities**: State management, error handling, resource cleanup
+- **Cross-references**: Points to MsQuic Core and specific callback diagrams
+- **Error Handling**: Application-level error recovery and cleanup strategies
+
+![Diagram](images/discrete-activity-application-layer.png)
+
+[🔍 View SVG](svg/discrete-activity-application-layer.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-application-layer.puml)
+
+#### 2: MsQuic Core Event Processing
+
+**MsQuic Core Event Processing (`msquic_core_flow`)**
+
+- Internal Processing: API validation, state updates, resource management
+- Event Generation: Network events, timer events, state change events
+- Network Processing: Packet parsing, frame processing, connection management
+- Performance Features: Zero-copy networking, efficient memory management
+
+![Diagram](images/discrete-activity-msquic-core-event-processing.png)
+
+[🔍 View SVG](svg/discrete-activity-msquic-core-event-processing.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-msquic-core-event-processing.puml)
+
+#### 3: Listener Callback Processing
+
+**Listener Callback Processing (`listener_callback_flow`) - EXPANDED & RESTRUCTURED**
+
+- NEW_CONNECTION Processing: Detailed connection acceptance flow
+  - Connection validation and filtering
+  - SetCallbackHandler() requirements
+  - ConnectionSetConfiguration() steps
+  - Accept/reject decision logic
+  
+- STOP_COMPLETE Processing: Listener shutdown handling
+- Clear Decision Points: Accept vs reject logic with proper status codes
+
+![Diagram](images/discrete-activity-listener-callback-processing.png)
+
+[🔍 View SVG](svg/discrete-activity-listener-callback-processing.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-listener-callback-processing.puml)
+
+#### 4: Connection Callback Processing
+
+**Connection Callback Processing (`connection_callback_flow`) - EXPANDED & RESTRUCTURED**
+
+- CONNECTED Event: Connection setup and initial stream creation
+- PEER_STREAM_STARTED: Stream acceptance with uni/bidirectional handling
+- DATAGRAM_RECEIVED: Unreliable datagram processing
+- SHUTDOWN Events: Both transport and peer-initiated shutdown
+- SHUTDOWN_COMPLETE: Critical ConnectionClose() requirement
+- Switch Structure: Clear event type handling with detailed processing
+
+![Diagram](images/discrete-activity-connection-callback-processing.png)
+
+[🔍 View SVG](svg/discrete-activity-connection-callback-processing.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-connection-callback-processing.puml)
+
+#### 5: Stream Callback Processing
+
+**Stream Callback Processing (`stream_callback_flow`) - NEW DEDICATED DIAGRAM**
+
+- RECEIVE Processing: Data processing and mandatory StreamReceiveComplete()
+- SEND_COMPLETE: Send completion handling and buffer management
+- SHUTDOWN Events: Peer FIN, abort handling, and cleanup
+- SHUTDOWN_COMPLETE: Critical StreamClose() requirement
+- Flow Control: Emphasis on mandatory flow control compliance
+
+![Diagram](images/discrete-activity-stream-callback-processing.png)
+
+[🔍 View SVG](svg/discrete-activity-stream-callback-processing.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-stream-callback-processing.puml)
+
+#### 6: Overview Diagram
+
+**Overview Diagram Benefits**:
+
+The Event Flow Overview provides:
+
+- High-level Architecture: Shows how all components interact
+- Reference Navigation: Points to detailed diagrams for each component
+- Performance Characteristics: Threading model and critical path operations
+- Error Propagation: How errors flow through the system
+- Resource Management: Proper cleanup and dependency handling
+
+![Diagram](images/discrete-activity-event-flow-overview.png)
+
+[🔍 View SVG](svg/discrete-activity-event-flow-overview.svg)  
+[🧾 View Source (.puml)](diagrams/discrete-activity-event-flow-overview.puml)
+
 ### Diagram 5: WebTransport Protocol Stack
 
 ![Diagram](images/webtransport-protocol-stack-and-message-flow.png)

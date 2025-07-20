@@ -1,0 +1,287 @@
+@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightpink
+  BorderColor black
+  ArrowColor black
+}
+
+title Stream Callback Processing
+
+start
+
+partition "**Callback Invocation**" {
+  :Receive event from MsQuic Core;
+  note right
+  **Reference: MsQuic Core Diagram**
+  Stream events queued by
+  MsQuic core processing
+  end note
+
+  :Invoke STREAM_CALLBACK;
+  note right
+  **Callback Signature:**
+  QUIC_STATUS QUIC_API STREAM_CALLBACK(
+    HQUIC Stream,
+    void* Context,
+    QUIC_STREAM_EVENT* Event)
+  end note
+
+  :Determine Event Type;
+  note right
+  **Stream Event Types:**
+  - START_COMPLETE (0)
+  - RECEIVE (1)
+  - SEND_COMPLETE (2)
+  - PEER_SEND_SHUTDOWN (3)
+  - PEER_SEND_ABORTED (4)
+  - SHUTDOWN_COMPLETE (7)
+  - And more...
+  end note
+}
+
+partition "**Event Type Routing**" {
+  :Route to appropriate processor;
+  note right
+  **Event Processing Logic:**
+  Each event type requires
+  specific handling logic
+  end note
+}
+
+partition "**RECEIVE Processing**" {
+  :Extract Receive Data;
+  note right
+  **RECEIVE Event Data:**
+  - AbsoluteOffset
+  - TotalBufferLength
+  - QUIC_BUFFER array
+  - BufferCount
+  - QUIC_RECEIVE_FLAGS
+  end note
+  
+  :Process Application Data;
+  note right
+  **Data Processing:**
+  - HTTP/3 frame parsing
+  - WebTransport stream data
+  - Application payload
+  - Protocol-specific handling
+  end note
+  
+  :Call StreamReceiveComplete();
+  note right
+  **CRITICAL REQUIREMENT:**
+  MUST call StreamReceiveComplete()
+  with bytes consumed
+  to update flow control
+  and free MsQuic buffers
+  end note
+}
+
+partition "**SEND_COMPLETE Processing**" {
+  :Extract Send Result;
+  note right
+  **SEND_COMPLETE Data:**
+  - Canceled flag
+  - ClientContext pointer
+  - Send operation result
+  - Buffer can be reused/freed
+  end note
+  
+  :Process Send Completion;
+  note right
+  **Send Completion:**
+  - Free send buffers
+  - Update send state
+  - Send more data if needed
+  - Handle send errors
+  end note
+}
+
+partition "**START_COMPLETE Processing**" {
+  :Extract Start Result;
+  note right
+  **START_COMPLETE Data:**
+  - QUIC_STATUS result
+  - QUIC_UINT62 stream ID
+  - PeerAccepted flag
+  - Stream ready for use
+  end note
+  
+  :Begin Data Transfer;
+  note right
+  **Stream Ready:**
+  - Stream fully established
+  - Can send/receive data
+  - Flow control active
+  - Begin application logic
+  end note
+}
+
+partition "**PEER_SEND_SHUTDOWN Processing**" {
+  :Handle Peer FIN;
+  note right
+  **Peer Send Shutdown:**
+  - Peer sent FIN frame
+  - No more data from peer
+  - Local send still possible
+  - Half-closed state
+  end note
+  
+  :Process Final Data;
+  note right
+  **Final Data Processing:**
+  - Complete pending receives
+  - Process remaining buffers
+  - Prepare for stream closure
+  - Send final response data
+  end note
+}
+
+partition "**PEER_SEND_ABORTED Processing**" {
+  :Extract Abort Reason;
+  note right
+  **PEER_SEND_ABORTED Data:**
+  - QUIC_UINT62 ErrorCode
+  - Peer reset send direction
+  - Abrupt termination
+  - Error condition
+  end note
+  
+  :Handle Send Abort;
+  note right
+  **Abort Handling:**
+  - Stop expecting peer data
+  - Clean up receive state
+  - Log error condition
+  - May close local send
+  end note
+}
+
+partition "**PEER_RECEIVE_ABORTED Processing**" {
+  :Extract Abort Reason;
+  note right
+  **PEER_RECEIVE_ABORTED Data:**
+  - QUIC_UINT62 ErrorCode
+  - Peer reset receive direction
+  - Stop sending data
+  - Remote not accepting data
+  end note
+  
+  :Stop Sending Data;
+  note right
+  **Send Termination:**
+  - Cancel pending sends
+  - Stop application data flow
+  - Clean up send buffers
+  - Update stream state
+  end note
+}
+
+partition "**SHUTDOWN_COMPLETE Processing**" {
+  :Extract Shutdown Info;
+  note right
+  **SHUTDOWN_COMPLETE Data:**
+  - ConnectionShutdown flag
+  - AppCloseInProgress flag
+  - ConnectionShutdownByApp flag
+  - ConnectionErrorCode
+  - Final cleanup trigger
+  end note
+  
+  :Cleanup Stream Resources;
+  note right
+  **Resource Cleanup:**
+  - Free stream context
+  - Release buffers
+  - Update stream tracking
+  - Clean up application state
+  end note
+  
+  :Close Stream Handle;
+  note right
+  **StreamClose():**
+  - REQUIRED action
+  - Frees MsQuic resources
+  - Must be called in this event
+  - Stream handle invalid after
+  end note
+}
+
+partition "**Other Stream Events Processing**" {
+  :Process Other Events;
+  note right
+  **Other Stream Events:**
+  - SEND_SHUTDOWN_COMPLETE
+  - IDEAL_SEND_BUFFER_SIZE
+  - PEER_ACCEPTED
+  - CANCEL_ON_LOSS
+  - Application-specific events
+  end note
+  
+  :Update Stream State;
+  note right
+  **State Updates:**
+  - Flow control hints
+  - Performance optimization
+  - Error recovery
+  - Application notifications
+  end note
+}
+
+partition "**Error Handling**" {
+  if (Callback Error?) then (yes)
+    :Handle Stream Error;
+    note right
+    **Error Recovery:**
+    - Log error details
+    - Clean up partial state
+    - Shutdown stream if needed
+    - Prevent resource leaks
+    end note
+    
+    :Return Error Status;
+    note right
+    **Error Codes:**
+    - QUIC_STATUS_INTERNAL_ERROR
+    - QUIC_STATUS_OUT_OF_MEMORY
+    - Application-specific errors
+    end note
+  else (no)
+    :Return QUIC_STATUS_SUCCESS;
+    note right
+    **Successful Processing:**
+    Event processed successfully
+    Continue stream operation
+    end note
+  endif
+}
+
+:Return to Application Layer;
+note right
+**Reference: Application Layer Diagram**
+Callback return value processed
+by application layer
+end note
+
+stop
+
+note left
+**Stream Callback Features:**
+- Stream data processing
+- Flow control management
+- Error and shutdown handling
+- Bidirectional communication
+- State synchronization
+end note
+
+note right
+**Performance Notes:**
+- Called on MsQuic worker threads
+- High frequency for data streams
+- RECEIVE events are critical path
+- StreamReceiveComplete is mandatory
+- Efficient processing essential
+end note
+@enduml

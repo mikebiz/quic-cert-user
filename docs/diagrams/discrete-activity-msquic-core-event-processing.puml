@@ -1,0 +1,185 @@
+﻿@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightyellow
+  BorderColor black
+  ArrowColor black
+}
+
+title MsQuic Core Event Processing
+
+start
+
+partition "**API Processing**" {
+  :Receive API call from Application Layer;
+  note right
+  **Reference: Application Layer Diagram**
+  Receives API calls from application
+  end note
+  
+  :Process API call;
+  note right
+  **API Processing:**
+  - Validate parameters
+  - Update object state
+  - Trigger internal actions
+  - Manage resources
+  end note
+  
+  :Update internal state;
+  note right
+  **Internal State Updates:**
+  - Connection state machines
+  - Stream state machines
+  - Flow control windows
+  - Congestion control
+  - Timer management
+  end note
+}
+
+partition "**Event Evaluation**" {
+  if (Event needs to be delivered?) then (yes)
+    :Determine Event Type;
+    note right
+    **Event Classification:**
+    - Network events (packets)
+    - Timer events (timeouts)
+    - API-triggered events
+    - State change events
+    - Error conditions
+    end note
+    
+    :Queue callback event;
+    note right
+    **Event Queuing:**
+    - Event prioritization
+    - Callback context setup
+    - Parameter preparation
+    - Thread safety management
+    end note
+    
+    :Send event to Callback Processing;
+    note right
+    **Reference: Callback Processing Diagrams**
+    Events routed to appropriate
+    callback handlers
+    end note
+    
+  else (no)
+    :Continue processing;
+    note right
+    **Internal Processing:**
+    - State updates only
+    - No application notification
+    - Background operations
+    end note
+  endif
+}
+
+partition "**Network Event Processing**" {
+  :Packet received from network;
+  note right
+  **Network Events:**
+  - UDP packet reception
+  - QUIC packet parsing
+  - Frame processing
+  - Connection identification
+  end note
+  
+  :Parse QUIC packet;
+  note right
+  **Packet Processing:**
+  - Connection ID lookup
+  - Packet number validation
+  - Decryption
+  - Frame extraction
+  end note
+  
+  :Process QUIC frames;
+  note right
+  **Frame Processing:**
+  - STREAM frames → Stream data
+  - ACK frames → Acknowledgments
+  - CONNECTION_CLOSE → Termination
+  - CRYPTO frames → Handshake
+  - DATAGRAM frames → Datagrams
+  end note
+  
+  :Update connection/stream state;
+  note right
+  **State Updates:**
+  - Flow control updates
+  - Congestion control
+  - Stream state changes
+  - Connection state changes
+  end note
+}
+
+partition "**Timer Event Processing**" {
+  :Timer expired;
+  note right
+  **Timer Events:**
+  - Idle timeout
+  - Retransmission timeout
+  - Keep-alive timeout
+  - Handshake timeout
+  - Loss detection timeout
+  end note
+  
+  :Process timeout;
+  note right
+  **Timeout Processing:**
+  - Packet retransmission
+  - Connection termination
+  - State cleanup
+  - Error generation
+  end note
+}
+
+partition "**Error Handling**" {
+  if (Error occurred?) then (yes)
+    :Generate error event;
+    note right
+    **Error Types:**
+    - Protocol violations
+    - Network errors
+    - Resource exhaustion
+    - Configuration errors
+    - TLS errors
+    end note
+    
+    :Update error state;
+    note right
+    **Error State Management:**
+    - Error code assignment
+    - State machine updates
+    - Resource cleanup
+    - Recovery attempts
+    end note
+  else (no)
+    :Normal operation continues;
+  endif
+}
+
+stop
+
+note left
+**MsQuic Core Features:**
+- RFC 9000 QUIC implementation
+- Multi-threaded processing
+- Event-driven architecture
+- State machine management
+- Network I/O handling
+- TLS integration
+- Flow/congestion control
+end note
+
+note right
+**Performance Features:**
+- Zero-copy networking
+- Efficient memory management
+- Optimized packet processing
+- Batched operations
+- Lock-free data structures
+end note
+@enduml

@@ -1,0 +1,204 @@
+@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightgreen
+  BorderColor black
+  ArrowColor black
+}
+
+title Listener Callback Processing
+
+start
+
+partition "**Callback Invocation**" {
+  :Receive event from MsQuic Core;
+  note right
+  **Reference: MsQuic Core Diagram**
+  Listener events queued by
+  MsQuic core processing
+  end note
+
+  :Invoke LISTENER_CALLBACK;
+  note right
+  **Callback Signature:**
+  QUIC_STATUS QUIC_API LISTENER_CALLBACK(
+    HQUIC Listener,
+    void* Context,
+    QUIC_LISTENER_EVENT* Event)
+  end note
+
+  :Determine Event Type;
+  note right
+  **Listener Event Types:**
+  - NEW_CONNECTION
+  - STOP_COMPLETE
+  end note
+}
+
+if (Event Type?) then (NEW_CONNECTION)
+  
+  partition "**NEW_CONNECTION Processing**" {
+    :Extract Connection Info;
+    note right
+    **QUIC_NEW_CONNECTION_INFO:**
+    - QuicVersion
+    - LocalAddress
+    - RemoteAddress
+    - CryptoBuffer (TLS handshake)
+    - ClientAlpnList
+    - NegotiatedAlpn
+    - ServerName (SNI)
+    end note
+    
+    :Validate Connection Request;
+    note right
+    **Validation Checks:**
+    - ALPN compatibility
+    - Source IP filtering
+    - Rate limiting
+    - Resource availability
+    - Authentication requirements
+    end note
+    
+    if (Accept Connection?) then (yes)
+      :Set Connection Callback;
+      note right
+      **SetCallbackHandler():**
+      - Assign connection callback function
+      - Set application context
+      - Enable connection event processing
+      end note
+      
+      :Set Connection Configuration;
+      note right
+      **ConnectionSetConfiguration():**
+      - Apply server TLS settings
+      - Set stream limits
+      - Configure flow control
+      - Enable features (datagrams, etc.)
+      end note
+      
+      :Return QUIC_STATUS_SUCCESS;
+      note right
+      **Connection Accepted:**
+      - Connection will proceed with handshake
+      - Application will receive connection events
+      - Resources allocated for connection
+      end note
+      
+    else (no)
+      :Return Error Status;
+      note right
+      **Connection Rejected:**
+      - QUIC_STATUS_UNREACHABLE
+      - QUIC_STATUS_CONNECTION_REFUSED
+      - Connection will be terminated
+      - No further events for this connection
+      end note
+    endif
+  }
+  
+elseif (STOP_COMPLETE)
+  
+  partition "**STOP_COMPLETE Processing**" {
+    :Process Stop Complete;
+    note right
+    **STOP_COMPLETE Data:**
+    - AppCloseInProgress flag
+    - Indicates listener shutdown complete
+    - No more NEW_CONNECTION events
+    end note
+    
+    :Cleanup Listener Resources;
+    note right
+    **Cleanup Actions:**
+    - Free listener context
+    - Update server state
+    - Stop accepting connections
+    - Clean up port binding
+    end note
+    
+    :Notify Application;
+    note right
+    **Application Notification:**
+    - Server shutdown complete
+    - Safe to close listener handle
+    - Update connection tracking
+    end note
+    
+    :Return QUIC_STATUS_SUCCESS;
+    note right
+    **Listener Stopped:**
+    - No more events on this listener
+    - Safe to call ListenerClose()
+    - Server can shutdown gracefully
+    end note
+  }
+  
+else (Unknown Event)
+  :Log Unknown Event;
+  note right
+  **Error Handling:**
+  - Log unexpected event type
+  - Return success to continue
+  - May indicate version mismatch
+  end note
+  
+  :Return QUIC_STATUS_SUCCESS;
+  note right
+  **Continue Operation:**
+  Unknown events are ignored
+  to maintain compatibility
+  end note
+endif
+
+partition "**Error Handling**" {
+  if (Callback Error?) then (yes)
+    :Handle Callback Error;
+    note right
+    **Error Recovery:**
+    - Log error details
+    - Clean up partial state
+    - Reject connection if applicable
+    - Continue listener operation
+    end note
+    
+    :Return Error Status;
+    note right
+    **Error Codes:**
+    - QUIC_STATUS_INTERNAL_ERROR
+    - QUIC_STATUS_OUT_OF_MEMORY
+    - Application-specific errors
+    end note
+  else (no)
+    :Successful Processing;
+  endif
+}
+
+:Return to Application Layer;
+note right
+**Reference: Application Layer Diagram**
+Callback return value processed
+by application layer
+end note
+
+stop
+
+note left
+**Listener Callback Features:**
+- Server-side connection acceptance
+- Connection filtering and validation
+- Resource management
+- Configuration application
+- Security policy enforcement
+end note
+
+note right
+**Performance Notes:**
+- Called on MsQuic worker threads
+- Should return quickly
+- Heavy processing should be deferred
+- Connection acceptance is critical path
+- Error handling affects server availability
+end note
+@enduml
