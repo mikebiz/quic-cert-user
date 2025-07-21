@@ -21,6 +21,8 @@
 
 This document provides a comprehensive set of PlantUML diagrams that document the complete QUIC/HTTP/3/WebTransport architecture. These diagrams serve as both implementation guides and debugging references for building WebTransport applications using Microsoft's MsQuic library.
 
+**Please reference** [this](msquic_objects_guide.md) document for details on **API** and high-level **interactions and dependencies**.
+
 ---
 
 ## Summary of Diagrams

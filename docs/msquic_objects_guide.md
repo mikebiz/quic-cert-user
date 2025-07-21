@@ -56,6 +56,16 @@ typedef struct QUIC_REGISTRATION_CONFIG {
 - `QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER` - Low priority background processing
 - `QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME` - Real-time applications
 
+### Additional Functions
+```cpp
+// Shutdown all connections in registration
+void MsQuic->RegistrationShutdown(
+    HQUIC Registration,
+    QUIC_CONNECTION_SHUTDOWN_FLAGS Flags,
+    QUIC_UINT62 ErrorCode
+);
+```
+
 ### No Callbacks
 Registration objects do not have callbacks.
 
@@ -158,6 +168,11 @@ QUIC_STATUS MsQuic->ListenerStart(
 );
 ```
 
+### Stopping Listener
+```cpp
+void MsQuic->ListenerStop(HQUIC Listener);
+```
+
 ### Callback Function
 ```cpp
 typedef QUIC_STATUS (QUIC_API QUIC_LISTENER_CALLBACK)(
@@ -197,28 +212,21 @@ typedef struct QUIC_NEW_CONNECTION_INFO {
 **Required Actions**:
 1. Set connection callback: `MsQuic->SetCallbackHandler(Connection, Callback, Context)`
 2. Set configuration: `MsQuic->ConnectionSetConfiguration(Connection, Configuration)`
-3. Return `QUIC_STATUS_SUCCESS` to accept, or error to reject
+3. Return `QUIC_STATUS_SUCCESS` to accept or `QUIC_STATUS_CONNECTION_REFUSED` to reject
 
 #### `QUIC_LISTENER_EVENT_STOP_COMPLETE`
 **Trigger**: Listener stop operation completed
-**Purpose**: Cleanup notification
-**Data Available**:
-```cpp
-struct {
-    BOOLEAN AppCloseInProgress : 1;     // Application initiated close
-    BOOLEAN RESERVED : 7;
-} STOP_COMPLETE;
-```
+**Purpose**: Cleanup notification when listener fully stopped
+**Data Available**: None
 
 ### Dependencies
-- **Requires**: Registration, Configuration (for accepted connections)
-- **Creates**: Connection objects via NEW_CONNECTION events
-- **Lifetime**: Independent of created connections
+- **Requires**: Registration
+- **Creates**: Connection objects (via NEW_CONNECTION events)
+- **Lifetime**: Can be stopped and restarted
 
-### Stopping and Cleanup
+### Cleanup
 ```cpp
-void MsQuic->ListenerStop(HQUIC Listener);    // Async stop
-void MsQuic->ListenerClose(HQUIC Listener);   // Final cleanup
+void MsQuic->ListenerClose(HQUIC Listener);
 ```
 
 ---
@@ -226,11 +234,11 @@ void MsQuic->ListenerClose(HQUIC Listener);   // Final cleanup
 ## Connection
 
 ### Purpose
-Represents a QUIC connection between client and server, managing streams, datagrams, and connection-level operations.
+Represents a QUIC connection for reliable, ordered data delivery. Connections can be client-initiated or server-accepted.
 
 ### Creation
 
-#### Client-side
+#### Client Connection
 ```cpp
 QUIC_STATUS MsQuic->ConnectionOpen(
     HQUIC Registration,
@@ -242,14 +250,51 @@ QUIC_STATUS MsQuic->ConnectionOpen(
 QUIC_STATUS MsQuic->ConnectionStart(
     HQUIC Connection,
     HQUIC Configuration,
-    QUIC_ADDRESS_FAMILY Family,
-    const char* ServerName,
-    uint16_t ServerPort
+    QUIC_ADDRESS_FAMILY Family,         // Address family (IPv4/IPv6)
+    const char* ServerName,             // Server hostname
+    uint16_t ServerPort                 // Server port
 );
 ```
 
-#### Server-side
-Created automatically via `QUIC_LISTENER_EVENT_NEW_CONNECTION`
+#### Server Connection
+Server connections are created automatically via `QUIC_LISTENER_EVENT_NEW_CONNECTION` events.
+
+### Configuration
+```cpp
+QUIC_STATUS MsQuic->ConnectionSetConfiguration(
+    HQUIC Connection,
+    HQUIC Configuration
+);
+```
+
+### Context Management
+```cpp
+void MsQuic->SetContext(HQUIC Handle, void* Context);
+void* MsQuic->GetContext(HQUIC Handle);
+
+void MsQuic->SetCallbackHandler(
+    HQUIC Handle,
+    void* Handler,
+    void* Context
+);
+```
+
+### Parameter Management
+```cpp
+QUIC_STATUS MsQuic->SetParam(
+    HQUIC Handle,
+    uint32_t Param,
+    uint32_t BufferLength,
+    const void* Buffer
+);
+
+QUIC_STATUS MsQuic->GetParam(
+    HQUIC Handle,
+    uint32_t Param,
+    uint32_t* BufferLength,
+    void* Buffer
+);
+```
 
 ### Callback Function
 ```cpp
@@ -263,219 +308,142 @@ typedef QUIC_STATUS (QUIC_API QUIC_CONNECTION_CALLBACK)(
 ### Event Types
 
 #### `QUIC_CONNECTION_EVENT_CONNECTED`
-**Trigger**: Connection handshake completed successfully
-**Purpose**: Connection is ready for streams and datagrams
+**Trigger**: Connection established successfully
+**Purpose**: Connection ready for stream creation
 **Data Available**:
 ```cpp
 struct {
     BOOLEAN SessionResumed;             // TLS session was resumed
-    uint8_t NegotiatedAlpnLength;       // Length of negotiated ALPN
+    uint8_t NegotiatedAlpnLength;       // Negotiated ALPN length
     const uint8_t* NegotiatedAlpn;      // Final ALPN protocol
 } CONNECTED;
 ```
 
-**Typical Actions**:
-- Create initial streams
-- Send initial application data
-- Set up application state
-
 #### `QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT`
-**Trigger**: QUIC transport layer initiated shutdown (protocol error, etc.)
-**Purpose**: Notification of transport-level connection termination
+**Trigger**: Transport layer initiated shutdown
+**Purpose**: Connection being closed due to protocol error
 **Data Available**:
 ```cpp
 struct {
-    QUIC_STATUS Status;                 // Reason for shutdown
-    QUIC_UINT62 ErrorCode;              // QUIC error code (wire format)
+    QUIC_STATUS Status;                 // Shutdown reason
+    QUIC_UINT62 ErrorCode;              // Transport error code
 } SHUTDOWN_INITIATED_BY_TRANSPORT;
 ```
 
 #### `QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER`
-**Trigger**: Remote peer initiated graceful connection shutdown
-**Purpose**: Peer is closing the connection
+**Trigger**: Peer initiated connection shutdown
+**Purpose**: Remote peer is closing connection
 **Data Available**:
 ```cpp
 struct {
-    QUIC_UINT62 ErrorCode;              // Application error code from peer
+    QUIC_UINT62 ErrorCode;              // Application error code
 } SHUTDOWN_INITIATED_BY_PEER;
 ```
 
 #### `QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE`
-**Trigger**: Connection shutdown process completed
-**Purpose**: Connection is fully closed and can be cleaned up
+**Trigger**: Connection shutdown completed
+**Purpose**: Safe to clean up connection resources
 **Data Available**:
 ```cpp
 struct {
-    BOOLEAN HandshakeCompleted : 1;      // Handshake finished before shutdown
-    BOOLEAN PeerAcknowledgedShutdown : 1; // Peer confirmed shutdown
-    BOOLEAN AppCloseInProgress : 1;      // App initiated close
+    BOOLEAN HandshakeCompleted;         // Handshake was completed
+    BOOLEAN PeerAcknowledgedShutdown;   // Peer acked shutdown
+    BOOLEAN AppCloseInProgress;         // App close in progress
 } SHUTDOWN_COMPLETE;
 ```
 
-**Required Action**: Call `MsQuic->ConnectionClose(Connection)`
-
-#### `QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED`
-**Trigger**: Local address changed (e.g., interface change, NAT rebind)
-**Data Available**:
-```cpp
-struct {
-    const QUIC_ADDR* Address;           // New local address
-} LOCAL_ADDRESS_CHANGED;
-```
-
-#### `QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED`
-**Trigger**: Peer address changed (connection migration)
-**Data Available**:
-```cpp
-struct {
-    const QUIC_ADDR* Address;           // New peer address
-} PEER_ADDRESS_CHANGED;
-```
-
 #### `QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED`
-**Trigger**: Peer opened a new stream
-**Purpose**: Accept or reject the new stream
+**Trigger**: Peer created a new stream
+**Purpose**: Accept or reject incoming stream
 **Data Available**:
 ```cpp
 struct {
     HQUIC Stream;                       // New stream handle
-    QUIC_STREAM_OPEN_FLAGS Flags;       // Stream characteristics
+    QUIC_STREAM_OPEN_FLAGS Flags;       // Stream properties
 } PEER_STREAM_STARTED;
-
-// QUIC_STREAM_OPEN_FLAGS values:
-// QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL - Stream is unidirectional
-// QUIC_STREAM_OPEN_FLAG_0_RTT - Stream opened in 0-RTT data
 ```
 
 **Required Actions**:
 1. Set stream callback: `MsQuic->SetCallbackHandler(Stream, StreamCallback, Context)`
-2. Optionally enable receive: `MsQuic->StreamReceiveSetEnabled(Stream, TRUE)`
-
-#### `QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE`
-**Trigger**: Flow control updated, more streams can be created
-**Data Available**:
-```cpp
-struct {
-    uint16_t BidirectionalCount;        // Available bidirectional streams
-    uint16_t UnidirectionalCount;       // Available unidirectional streams
-} STREAMS_AVAILABLE;
-```
-
-#### `QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS`
-**Trigger**: Peer needs more stream capacity
-**Data Available**:
-```cpp
-struct {
-    BOOLEAN Bidirectional;              // Type of streams needed
-} PEER_NEEDS_STREAMS;
-```
-
-#### `QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED`
-**Trigger**: Optimal processor for this connection changed
-**Data Available**:
-```cpp
-struct {
-    uint16_t IdealProcessor;            // Recommended processor
-    uint16_t PartitionIndex;            // Partition index
-} IDEAL_PROCESSOR_CHANGED;
-```
-
-#### `QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED`
-**Trigger**: Datagram send capability changed
-**Data Available**:
-```cpp
-struct {
-    BOOLEAN SendEnabled;                // Can send datagrams
-    uint16_t MaxSendLength;             // Maximum datagram size
-} DATAGRAM_STATE_CHANGED;
-```
+2. Optionally call `MsQuic->StreamReceiveSetEnabled(Stream, TRUE)` for receive events
 
 #### `QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED`
-**Trigger**: Unreliable datagram received from peer
+**Trigger**: Unreliable datagram received
+**Purpose**: Process datagram data
 **Data Available**:
 ```cpp
 struct {
     const QUIC_BUFFER* Buffer;          // Datagram data
-    QUIC_RECEIVE_FLAGS Flags;           // Receive flags (0-RTT, etc.)
+    QUIC_RECEIVE_FLAGS Flags;           // Receive flags
 } DATAGRAM_RECEIVED;
 ```
 
 #### `QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED`
-**Trigger**: Datagram send operation completed or failed
+**Trigger**: Datagram send status updated
+**Purpose**: Track datagram delivery
 **Data Available**:
 ```cpp
 struct {
-    void* ClientContext;                // Context from send call
-    QUIC_DATAGRAM_SEND_STATE State;     // Final state
+    void* ClientContext;                // Context from send
+    QUIC_DATAGRAM_SEND_STATE State;     // Send state
 } DATAGRAM_SEND_STATE_CHANGED;
-
-// QUIC_DATAGRAM_SEND_STATE values:
-// QUIC_DATAGRAM_SEND_SENT - Sent and awaiting ACK
-// QUIC_DATAGRAM_SEND_LOST_SUSPECT - Possibly lost
-// QUIC_DATAGRAM_SEND_LOST_DISCARDED - Confirmed lost
-// QUIC_DATAGRAM_SEND_ACKNOWLEDGED - Successfully received
-// QUIC_DATAGRAM_SEND_CANCELED - Canceled before send
-```
-
-#### `QUIC_CONNECTION_EVENT_RESUMED`
-**Trigger**: TLS session resumption information available (server only)
-**Data Available**:
-```cpp
-struct {
-    uint16_t ResumptionStateLength;     // State data length
-    const uint8_t* ResumptionState;     // Application resumption data
-} RESUMED;
 ```
 
 #### `QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED`
-**Trigger**: TLS resumption ticket received (client only)
+**Trigger**: TLS resumption ticket received (client)
+**Purpose**: Store ticket for future session resumption
 **Data Available**:
 ```cpp
 struct {
     uint32_t ResumptionTicketLength;    // Ticket length
-    const uint8_t* ResumptionTicket;    // Ticket data to persist
+    const uint8_t* ResumptionTicket;    // Ticket data
 } RESUMPTION_TICKET_RECEIVED;
 ```
 
 #### `QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED`
-**Trigger**: Peer certificate available for validation (if enabled)
+**Trigger**: Peer certificate available for validation
+**Purpose**: Custom certificate validation
 **Data Available**:
 ```cpp
 struct {
-    QUIC_CERTIFICATE* Certificate;      // Platform-specific certificate
-    uint32_t DeferredErrorFlags;        // Validation error flags
-    QUIC_STATUS DeferredStatus;         // Validation status
-    QUIC_CERTIFICATE_CHAIN* Chain;      // Certificate chain
+    QUIC_CERTIFICATE* Certificate;      // Certificate chain
+    uint32_t DeferredErrorFlags;        // Deferred validation errors
+    QUIC_STATUS DeferredStatus;         // Deferred validation status
 } PEER_CERTIFICATE_RECEIVED;
 ```
 
-### Connection Operations
+**Required Actions**:
+Must call `MsQuic->ConnectionCertificateValidationComplete(Connection, Result, TlsAlert)` to complete validation.
 
-#### Creating Streams
+### Advanced Functions
+
+#### Session Resumption
 ```cpp
-QUIC_STATUS MsQuic->StreamOpen(
+QUIC_STATUS MsQuic->ConnectionSendResumptionTicket(
     HQUIC Connection,
-    QUIC_STREAM_OPEN_FLAGS Flags,
-    QUIC_STREAM_CALLBACK_HANDLER Handler,
-    void* Context,
-    HQUIC* Stream
+    QUIC_SEND_RESUMPTION_FLAGS Flags,
+    uint16_t DataLength,
+    const uint8_t* ResumptionData
+);
+
+QUIC_STATUS MsQuic->ConnectionResumptionTicketValidationComplete(
+    HQUIC Connection,
+    BOOLEAN Result
 );
 ```
 
-#### Sending Datagrams
+#### Certificate Validation
 ```cpp
-QUIC_STATUS MsQuic->DatagramSend(
+QUIC_STATUS MsQuic->ConnectionCertificateValidationComplete(
     HQUIC Connection,
-    const QUIC_BUFFER* Buffers,
-    uint32_t BufferCount,
-    QUIC_SEND_FLAGS Flags,
-    void* ClientContext
+    BOOLEAN Result,
+    QUIC_TLS_ALERT_CODES TlsAlert
 );
 ```
 
-#### Shutdown
+### Shutdown
 ```cpp
-void MsQuic->ConnectionShutdown(
+QUIC_STATUS MsQuic->ConnectionShutdown(
     HQUIC Connection,
     QUIC_CONNECTION_SHUTDOWN_FLAGS Flags,
     QUIC_UINT62 ErrorCode
@@ -518,14 +486,14 @@ QUIC_STATUS MsQuic->StreamStart(
 ### Stream Flags
 ```cpp
 // Open flags
-QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL    // Create unidirectional stream
-QUIC_STREAM_OPEN_FLAG_0_RTT             // Allow 0-RTT data
+QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL      // Create unidirectional stream
+QUIC_STREAM_OPEN_FLAG_0_RTT               // Allow 0-RTT data
 QUIC_STREAM_OPEN_FLAG_DELAY_ID_FC_UPDATES // Delay flow control updates
 
-// Start flags  
-QUIC_STREAM_START_FLAG_IMMEDIATE         // Immediately notify peer
-QUIC_STREAM_START_FLAG_FAIL_BLOCKED      // Fail if flow control blocks
-QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL  // Shutdown on start failure
+// Start flags
+QUIC_STREAM_START_FLAG_IMMEDIATE          // Immediately notify peer
+QUIC_STREAM_START_FLAG_FAIL_BLOCKED       // Fail if flow control blocks
+QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL   // Shutdown on start failure
 QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT // Indicate peer acceptance
 ```
 
@@ -583,57 +551,58 @@ struct {
 ```
 
 #### `QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN`
-**Trigger**: Peer finished sending (sent FIN)
-**Purpose**: Peer has no more data to send
-**No additional data**
+**Trigger**: Peer closed send direction (sent FIN)
+**Purpose**: No more data will be received
+**Data Available**: None
 
 #### `QUIC_STREAM_EVENT_PEER_SEND_ABORTED`
-**Trigger**: Peer aborted sending
+**Trigger**: Peer aborted send direction
+**Purpose**: Stream reset by peer
 **Data Available**:
 ```cpp
 struct {
-    QUIC_UINT62 ErrorCode;              // Peer's abort error code
+    QUIC_UINT62 ErrorCode;              // Peer's error code
 } PEER_SEND_ABORTED;
 ```
 
 #### `QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED`
-**Trigger**: Peer aborted receiving
+**Trigger**: Peer aborted receive direction
+**Purpose**: Peer will not accept more data
 **Data Available**:
 ```cpp
 struct {
-    QUIC_UINT62 ErrorCode;              // Peer's abort error code
+    QUIC_UINT62 ErrorCode;              // Peer's error code
 } PEER_RECEIVE_ABORTED;
 ```
 
 #### `QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE`
-**Trigger**: Local send shutdown completed
+**Trigger**: Send shutdown completed
 **Data Available**:
 ```cpp
 struct {
-    BOOLEAN Graceful;                   // Graceful shutdown (FIN sent)
+    BOOLEAN Graceful;                   // Was shutdown graceful
 } SEND_SHUTDOWN_COMPLETE;
 ```
 
 #### `QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE`
-**Trigger**: Stream completely shut down
-**Purpose**: Stream can be cleaned up
+**Trigger**: Stream completely shutdown
+**Purpose**: Safe to clean up stream resources
 **Data Available**:
 ```cpp
 struct {
     BOOLEAN ConnectionShutdown;         // Connection is shutting down
-    BOOLEAN AppCloseInProgress : 1;     // App initiated close
-    BOOLEAN ConnectionShutdownByApp : 1; // App shut down connection
-    BOOLEAN ConnectionClosedRemotely : 1; // Remote peer closed connection
+    BOOLEAN AppCloseInProgress : 1;     // App close in progress
+    BOOLEAN ConnectionShutdownByApp : 1; // Shutdown by app
+    BOOLEAN ConnectionClosedRemotely : 1; // Closed by peer
     BOOLEAN RESERVED : 5;
-    QUIC_UINT62 ConnectionErrorCode;    // Connection error code
-    QUIC_STATUS ConnectionCloseStatus;  // Connection close status
+    QUIC_UINT62 ConnectionErrorCode;    // Connection error
+    QUIC_STATUS ConnectionCloseStatus;  // Connection status
 } SHUTDOWN_COMPLETE;
 ```
 
-**Required Action**: Call `MsQuic->StreamClose(Stream)`
-
 #### `QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE`
 **Trigger**: Recommended send buffer size changed
+**Purpose**: Optimize send performance
 **Data Available**:
 ```cpp
 struct {
@@ -794,53 +763,65 @@ Available via `QUIC_PARAM_CONN_TLS_SECRETS` parameter for Wireshark decryption.
 ## Dependencies and Lifecycle
 
 ### Creation Order
-1. **Registration** - Create first, process-wide context
-2. **Configuration** - Configure TLS, ALPN, settings
-3. **Listener** (server) OR **Connection** (client) 
-4. **Connection** (server: via listener events)
-5. **Stream** - Created on demand
+1. **MsQuicOpen2()** - Initialize MsQuic library and get API table
+2. **Registration** - Create first, process-wide context
+3. **Configuration** - Configure TLS, ALPN, settings
+4. **Listener** (server) OR **Connection** (client) 
+5. **Connection** (server: via listener events)
+6. **Stream** - Created on demand
 
 ### Destruction Order (Reverse)
 1. **Stream** - Close all streams first
 2. **Connection** - Close connections
 3. **Listener** - Stop and close listener
 4. **Configuration** - Close configuration
-5. **Registration** - Close last
+5. **Registration** - Close registration
+6. **MsQuicClose()** - Close library
 
-### Dependency Matrix
+### Key API Table Functions
+```cpp
+typedef struct QUIC_API_TABLE {
+    QUIC_SET_CONTEXT_FN                 SetContext;
+    QUIC_GET_CONTEXT_FN                 GetContext;
+    QUIC_SET_CALLBACK_HANDLER_FN        SetCallbackHandler;
 
-| Object | Requires | Creates | Used By |
-|--------|----------|---------|---------|
-| Registration | None | None | Configuration, Listener, Connection |
-| Configuration | Registration | None | Listener, Connection |
-| Listener | Registration | Connection | None |
-| Connection | Registration, Configuration | Stream | Stream |
-| Stream | Connection | None | None |
+    QUIC_SET_PARAM_FN                   SetParam;
+    QUIC_GET_PARAM_FN                   GetParam;
 
-### Callback Dependency Chain
+    QUIC_REGISTRATION_OPEN_FN           RegistrationOpen;
+    QUIC_REGISTRATION_CLOSE_FN          RegistrationClose;
+    QUIC_REGISTRATION_SHUTDOWN_FN       RegistrationShutdown;
+
+    QUIC_CONFIGURATION_OPEN_FN          ConfigurationOpen;
+    QUIC_CONFIGURATION_CLOSE_FN         ConfigurationClose;
+    QUIC_CONFIGURATION_LOAD_CREDENTIAL_FN ConfigurationLoadCredential;
+
+    QUIC_LISTENER_OPEN_FN               ListenerOpen;
+    QUIC_LISTENER_CLOSE_FN              ListenerClose;
+    QUIC_LISTENER_START_FN              ListenerStart;
+    QUIC_LISTENER_STOP_FN               ListenerStop;
+
+    QUIC_CONNECTION_OPEN_FN             ConnectionOpen;
+    QUIC_CONNECTION_CLOSE_FN            ConnectionClose;
+    QUIC_CONNECTION_SHUTDOWN_FN         ConnectionShutdown;
+    QUIC_CONNECTION_START_FN            ConnectionStart;
+    QUIC_CONNECTION_SET_CONFIGURATION_FN ConnectionSetConfiguration;
+    QUIC_CONNECTION_SEND_RESUMPTION_FN  ConnectionSendResumptionTicket;
+
+    QUIC_STREAM_OPEN_FN                 StreamOpen;
+    QUIC_STREAM_CLOSE_FN                StreamClose;
+    QUIC_STREAM_START_FN                StreamStart;
+    QUIC_STREAM_SHUTDOWN_FN             StreamShutdown;
+    QUIC_STREAM_SEND_FN                 StreamSend;
+    QUIC_STREAM_RECEIVE_COMPLETE_FN     StreamReceiveComplete;
+    QUIC_STREAM_RECEIVE_SET_ENABLED_FN  StreamReceiveSetEnabled;
+
+    QUIC_DATAGRAM_SEND_FN               DatagramSend;
+
+    QUIC_CONNECTION_COMP_RESUMPTION_FN  ConnectionResumptionTicketValidationComplete;
+    QUIC_CONNECTION_COMP_CERT_FN        ConnectionCertificateValidationComplete;
+} QUIC_API_TABLE;
 ```
-Listener Callback
-    ├─→ Creates Connection
-    │   ├─→ Connection Callback
-    │   │   ├─→ CONNECTED → Can create streams
-    │   │   ├─→ PEER_STREAM_STARTED → Creates stream
-    │   │   │   └─→ Stream Callback
-    │   │   │       ├─→ RECEIVE → Process data
-    │   │   │       ├─→ SEND_COMPLETE → Send more data
-    │   │   │       └─→ SHUTDOWN_COMPLETE → Close stream
-    │   │   ├─→ DATAGRAM_RECEIVED → Process datagram
-    │   │   └─→ SHUTDOWN_COMPLETE → Close connection
-    │   └─→ Set Configuration
-    └─→ Set Connection Callback
-```
-
-### Thread Safety Notes
-- **Registration**: Thread-safe
-- **Configuration**: Thread-safe (immutable after credential load)
-- **Listener**: Thread-safe
-- **Connection**: Callbacks serialized per connection
-- **Stream**: Callbacks serialized per stream
-- **Cross-object**: Not thread-safe (don't share handles across threads)
 
 ---
 
@@ -848,44 +829,114 @@ Listener Callback
 
 ### Client Connection Flow
 ```
-1. ConnectionOpen() → Connection Handle
-2. ConnectionStart() → Connecting
-3. CONNECTION_CONNECTED → Ready for streams
-4. StreamOpen() → Stream Handle  
-5. StreamStart() → Stream ready
-6. StreamSend() → SEND_COMPLETE
-7. RECEIVE → Data from peer
-8. StreamShutdown() → SHUTDOWN_COMPLETE
-9. StreamClose() → Stream destroyed
-10. ConnectionShutdown() → SHUTDOWN_COMPLETE
-11. ConnectionClose() → Connection destroyed
+1. MsQuicOpen2() → API Table
+2. RegistrationOpen() → Registration Handle
+3. ConfigurationOpen() → Configuration Handle
+4. ConfigurationLoadCredential() → TLS Setup
+5. ConnectionOpen() → Connection Handle
+6. SetCallbackHandler() → Connection callback set
+7. ConnectionStart() → Connecting
+8. CONNECTION_CONNECTED → Ready for streams
+9. StreamOpen() → Stream Handle
+10. SetCallbackHandler() → Stream callback set
+11. StreamStart() → Stream ready
+12. StreamSend() → SEND_COMPLETE
+13. RECEIVE → Data from peer
+14. StreamShutdown() → SHUTDOWN_COMPLETE
+15. StreamClose() → Stream destroyed
+16. ConnectionShutdown() → SHUTDOWN_COMPLETE
+17. ConnectionClose() → Connection destroyed
 ```
 
 ### Server Connection Flow
 ```
-1. ListenerOpen() → Listener Handle
-2. ListenerStart() → Listening
-3. NEW_CONNECTION → New connection available
-4. SetCallbackHandler() → Connection callback set
-5. ConnectionSetConfiguration() → Connection configured
-6. CONNECTION_CONNECTED → Ready for streams
-7. PEER_STREAM_STARTED → Peer created stream
-8. SetCallbackHandler() → Stream callback set
-9. RECEIVE → Data from peer
-10. StreamSend() → Send response
-11. [Continue until shutdown...]
+1. MsQuicOpen2() → API Table
+2. RegistrationOpen() → Registration Handle
+3. ConfigurationOpen() → Configuration Handle
+4. ConfigurationLoadCredential() → TLS Setup
+5. ListenerOpen() → Listener Handle
+6. SetCallbackHandler() → Listener callback set
+7. ListenerStart() → Listening
+8. NEW_CONNECTION → New connection available
+9. SetCallbackHandler() → Connection callback set
+10. ConnectionSetConfiguration() → Connection configured
+11. CONNECTION_CONNECTED → Ready for streams
+12. PEER_STREAM_STARTED → Peer created stream
+13. SetCallbackHandler() → Stream callback set
+14. StreamReceiveSetEnabled() → Enable receive events
+15. RECEIVE → Data from peer
+16. StreamSend() → Send response
+17. [Continue until shutdown...]
 ```
 
 ### WebTransport Flow (HTTP/3 over QUIC)
 ```
-1. Connection established
-2. Create control stream (unidirectional)
-3. Send SETTINGS frame with ENABLE_WEBTRANSPORT
-4. Create bidirectional stream for CONNECT
-5. Send HEADERS frame with WebTransport CONNECT
-6. Receive 200 OK response
+1. Connection established (QUIC handshake complete)
+2. Create control stream (unidirectional, ID 2)
+3. Send SETTINGS frame with ENABLE_WEBTRANSPORT=1
+4. Create bidirectional stream for CONNECT (ID 0)
+5. Send HEADERS frame with WebTransport CONNECT request
+6. Receive 200 OK response from server
 7. WebTransport session established
-8. Create additional streams/send datagrams
+8. Create additional streams/send datagrams for application data
 ```
 
-This reference should help you understand the complete MsQuic object model, when callbacks are triggered, what data is available, and how objects depend on each other throughout their lifecycle.
+### Core Event Processing Flow
+```
+1. Network packet received → MsQuic Core
+2. Packet parsing and frame processing
+3. State updates and validation
+4. Event generation based on frame type
+5. Callback invocation with event data
+6. Application processing in callback
+7. Return status to MsQuic Core
+8. Continue operation or handle errors
+```
+
+### Listener Callback Processing
+```
+1. Incoming connection attempt
+2. Extract connection information (ALPN, SNI, addresses)
+3. Validate connection request
+4. Accept/reject decision logic
+5. If accepted: SetCallbackHandler() + ConnectionSetConfiguration()
+6. Return status (SUCCESS = accept, CONNECTION_REFUSED = reject)
+7. Connection proceeds to CONNECTED state
+```
+
+### Connection Callback Processing
+```
+1. Receive event from MsQuic Core
+2. Determine event type (CONNECTED, PEER_STREAM_STARTED, etc.)
+3. Route to appropriate processor
+4. Extract relevant data from event structure
+5. Perform application-specific logic
+6. For streams: SetCallbackHandler() if new stream
+7. Return status to continue operation
+```
+
+### Stream Callback Processing
+```
+1. Receive stream event from MsQuic Core
+2. Process based on event type:
+   - RECEIVE: Process data + StreamReceiveComplete()
+   - SEND_COMPLETE: Handle completion status
+   - SHUTDOWN events: Cleanup resources
+3. Manage flow control and state
+4. Return status to MsQuic
+```
+
+### Error Handling Flow
+```
+1. Error detected (network, protocol, or application)
+2. Generate appropriate error event
+3. Propagate to application via callbacks
+4. Application decides recovery strategy:
+   - Continue operation (ignore/retry)
+   - Graceful shutdown
+   - Immediate abort
+5. Cleanup resources as needed
+6. Update connection/stream state
+```
+
+This comprehensive reference covers all the MsQuic API functions and events referenced in the PlantUML diagrams while maintaining the general structure and readability of the original objects guide. The document now includes all the core functions like MsQuicOpen2, SetCallbackHandler, SetContext, GetContext, SetParam, GetParam, and the advanced functions like ConnectionResumptionTicketValidationComplete and ConnectionCertificateValidationComplete that are used in real WebTransport and HTTP/3 implementations.
