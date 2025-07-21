@@ -1,0 +1,165 @@
+﻿@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightcyan
+  BorderColor black
+  ArrowColor black
+}
+
+title WebTransport Message Flow Examples
+
+start
+
+partition "**1. WebTransport CONNECT Request**" {
+  :Client sends CONNECT request;
+  note right
+  **HEADERS Frame (Client → Server):**
+  Frame Type: 0x01 (HEADERS)
+  
+  QPACK Encoded Headers:
+  :method: CONNECT
+  :protocol: webtransport
+  :scheme: https
+  :authority: example.com:443
+  :path: /chat
+  end note
+  
+  :Server validates request;
+  note right
+  **Validation Checks:**
+  - Protocol is "webtransport"
+  - Method is "CONNECT"
+  - Authority and path are valid
+  - Server supports WebTransport
+  end note
+}
+
+partition "**2. WebTransport Response**" {
+  :Server sends 200 OK response;
+  note right
+  **HEADERS Frame (Server → Client):**
+  Frame Type: 0x01 (HEADERS)
+  
+  QPACK Encoded Headers:
+  :status: 200
+  
+  (WebTransport session established)
+  end note
+  
+  :Client processes response;
+  note right
+  **Client Processing:**
+  - Parse :status header
+  - Verify 200 OK status
+  - Mark session as established
+  - Enable WebTransport operations
+  end note
+}
+
+partition "**3. Bidirectional Stream Communication**" {
+  :Client creates bidirectional stream;
+  note right
+  **Stream Creation:**
+  Stream ID: 4 (next available)
+  Type: Bidirectional
+  Purpose: Chat messages
+  end note
+  
+  :Client sends message data;
+  note right
+  **Stream Data (Client → Server):**
+  Raw Data: "Hello WebTransport!"
+  
+  (No HTTP/3 framing needed)
+  (Direct application data)
+  end note
+  
+  :Server processes and responds;
+  note right
+  **Stream Data (Server → Client):**
+  Raw Data: "Welcome to chat!"
+  
+  Characteristics:
+  - Reliable delivery
+  - Ordered delivery
+  - Flow controlled
+  end note
+}
+
+partition "**4. Unidirectional Stream**" {
+  :Client creates unidirectional stream;
+  note right
+  **Stream Creation:**
+  Stream ID: 6 (next available)
+  Type: Unidirectional (client → server)
+  Purpose: Log data, telemetry
+  end note
+  
+  :Client sends one-way data;
+  note right
+  **One-way Data:**
+  JSON: {"event": "user_action", "data": {...}}
+  
+  Characteristics:
+  - Client sends only
+  - Server receives only
+  - Lower overhead
+  end note
+}
+
+partition "**5. WebTransport Datagrams**" {
+  :Client sends unreliable datagram;
+  note right
+  **QUIC Datagram (Client → Server):**
+  JSON: {"type": "ping", "timestamp": 123456}
+  
+  Characteristics:
+  - Unreliable delivery
+  - Unordered delivery
+  - Low latency
+  - No retransmission
+  end note
+  
+  :Server responds with datagram;
+  note right
+  **QUIC Datagram (Server → Client):**
+  JSON: {"type": "pong", "timestamp": 123456}
+  
+  Use Cases:
+  - Game state updates
+  - Real-time sensors
+  - Voice/video metadata
+  end note
+}
+
+partition "**6. Session Termination**" {
+  :Client initiates session close;
+  note right
+  **Graceful Shutdown:**
+  - Close all WebTransport streams
+  - Send final datagrams
+  - Close CONNECT stream
+  - Terminate QUIC connection
+  end note
+  
+  :Server acknowledges closure;
+  note right
+  **Server Cleanup:**
+  - Process final data
+  - Release session resources
+  - Update connection tracking
+  - Complete shutdown
+  end note
+}
+
+stop
+
+note left
+**Message Flow Characteristics:**
+- HTTP/3 frames for control
+- Raw data for WebTransport streams
+- QUIC datagrams for unreliable data
+- Multiplexed over single connection
+end note
+
+@enduml

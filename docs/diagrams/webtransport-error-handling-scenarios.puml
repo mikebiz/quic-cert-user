@@ -1,0 +1,240 @@
+@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightpink
+  BorderColor black
+  ArrowColor black
+}
+
+title WebTransport Error Handling Scenarios
+
+start
+
+partition "**Connection Level Errors**" {
+  :QUIC Connection Error;
+  note right
+  **Connection Error Types:**
+  - Protocol violations
+  - TLS handshake failures
+  - Version negotiation failures
+  - Network connectivity issues
+  
+  **Impact:**
+  - All streams terminated
+  - All datagrams lost
+  - Session completely fails
+  - Client must reconnect
+  end note
+  
+  :Handle Connection Failure;
+  note right
+  **Error Recovery:**
+  - Log connection error details
+  - Clean up all session state
+  - Notify application of failure
+  - Attempt reconnection if appropriate
+  end note
+}
+
+partition "**HTTP/3 Protocol Errors**" {
+  :Invalid HTTP/3 Frame;
+  note right
+  **Frame Error Types:**
+  - Malformed frame headers
+  - Invalid frame sequences
+  - Unsupported frame types
+  - QPACK encoding errors
+  
+  **Recovery:**
+  - Send HTTP/3 connection error
+  - Close HTTP/3 connection
+  - May allow QUIC connection reuse
+  end note
+  
+  :HTTP/3 Stream Error;
+  note right
+  **Stream Error Types:**
+  - Invalid HEADERS frame
+  - Protocol state violations
+  - Unsupported pseudo-headers
+  - Content encoding errors
+  
+  **Recovery:**
+  - Reset specific stream
+  - Continue other streams
+  - Log error for debugging
+  end note
+}
+
+partition "**WebTransport CONNECT Errors**" {
+  :CONNECT Request Rejected;
+  note right
+  **Rejection Scenarios:**
+  - 400 Bad Request (malformed)
+  - 404 Not Found (invalid path)
+  - 403 Forbidden (authorization)
+  - 503 Service Unavailable
+  
+  **Client Handling:**
+  - Parse error status code
+  - Read error details if provided
+  - Do not establish WebTransport session
+  - Report failure to application
+  end note
+  
+  :Unsupported Protocol;
+  note right
+  **Protocol Mismatch:**
+  - Server doesn't support WebTransport
+  - Invalid :protocol header
+  - Version incompatibility
+  
+  **Error Response:**
+  - 501 Not Implemented
+  - 505 HTTP Version Not Supported
+  - Custom error codes
+  end note
+}
+
+partition "**Stream Level Errors**" {
+  :Stream Reset by Peer;
+  note right
+  **Reset Scenarios:**
+  - Peer calls stream.abort()
+  - Application error in peer
+  - Resource exhaustion
+  - Invalid data received
+  
+  **Error Codes:**
+  - Application-defined codes
+  - Standard WebTransport codes
+  - Implementation-specific codes
+  end note
+  
+  :Handle Stream Reset;
+  note right
+  **Reset Recovery:**
+  - Stop sending on stream
+  - Clean up stream resources
+  - Log reset reason
+  - Continue session operation
+  - Notify application layer
+  end note
+  
+  :Flow Control Violation;
+  note right
+  **Flow Control Errors:**
+  - Exceeded stream window
+  - Exceeded connection window
+  - Invalid flow control frames
+  
+  **Consequences:**
+  - Stream termination
+  - Possible connection closure
+  - Protocol error reporting
+  end note
+}
+
+partition "**Datagram Errors**" {
+  :Datagram Send Failure;
+  note right
+  **Send Failure Types:**
+  - Datagram too large
+  - Connection not ready
+  - Network congestion
+  - Peer doesn't support datagrams
+  
+  **Handling:**
+  - Return error to application
+  - No automatic retry
+  - Application decides next action
+  end note
+  
+  :Datagram Loss;
+  note right
+  **Loss Characteristics:**
+  - No delivery guarantee
+  - No loss notification
+  - No automatic retransmission
+  - Application responsibility
+  
+  **Mitigation:**
+  - Use sequence numbers
+  - Implement timeouts
+  - Switch to streams if needed
+  end note
+}
+
+partition "**Session Management Errors**" {
+  :Session State Mismatch;
+  note right
+  **State Error Types:**
+  - Operations on closed session
+  - Invalid stream operations
+  - Concurrent modification issues
+  - Resource limit exceeded
+  
+  **Prevention:**
+  - Proper state tracking
+  - Synchronization mechanisms
+  - Resource monitoring
+  - Graceful degradation
+  end note
+  
+  :Resource Exhaustion;
+  note right
+  **Resource Limits:**
+  - Maximum streams exceeded
+  - Memory allocation failures
+  - Buffer overflow conditions
+  - CPU/bandwidth limits
+  
+  **Responses:**
+  - Reject new operations
+  - Close least important streams
+  - Implement backpressure
+  - Scale resources if possible
+  end note
+}
+
+partition "**Error Recovery Strategies**" {
+  :Graceful Degradation;
+  note right
+  **Degradation Approaches:**
+  - Fall back to fewer streams
+  - Disable datagram usage
+  - Reduce data rates
+  - Use alternative protocols
+  end note
+  
+  :Retry Mechanisms;
+  note right
+  **Retry Strategies:**
+  - Exponential backoff
+  - Circuit breaker pattern
+  - Jitter to avoid thundering herd
+  - Maximum retry limits
+  end note
+  
+  :Error Reporting;
+  note right
+  **Comprehensive Logging:**
+  - Error codes and descriptions
+  - Context and timing information
+  - Recovery actions taken
+  - Performance impact metrics
+  end note
+}
+
+stop
+
+note left
+**Error Handling Best Practices:**
+- Distinguish between recoverable and fatal errors
+- Implement proper timeout mechanisms
+- Log sufficient detail for debugging
+- Gracefully degrade functionality
+- Provide meaningful error messages to applications
+end note
+
+@enduml

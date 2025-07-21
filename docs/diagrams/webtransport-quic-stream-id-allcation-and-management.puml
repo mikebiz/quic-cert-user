@@ -1,0 +1,170 @@
+@startuml
+!theme plain
+skinparam activity {
+  BackgroundColor lightyellow
+  BorderColor black
+  ArrowColor black
+}
+
+title QUIC Stream ID Allocation and Management
+
+start
+
+partition "**Stream ID Allocation Rules**" {
+  :QUIC Stream ID Assignment;
+  note right
+  **Stream ID Bit Pattern:**
+  Bit 0: Initiator (0=Client, 1=Server)
+  Bit 1: Direction (0=Bidirectional, 1=Unidirectional)
+  Bits 2+: Stream Number
+  end note
+  
+  :Determine Stream Type;
+  note right
+  **Stream Type Calculation:**
+  Stream ID % 4:
+  - 0: Client-initiated bidirectional
+  - 1: Server-initiated bidirectional
+  - 2: Client-initiated unidirectional
+  - 3: Server-initiated unidirectional
+  end note
+}
+
+partition "**Client-Initiated Streams**" {
+  :Client Bidirectional Streams;
+  note right
+  **Stream IDs: 0, 4, 8, 12, 16, 20, ...**
+  
+  Usage:
+  - HTTP/3 request streams
+  - WebTransport CONNECT stream (ID 0)
+  - WebTransport bidirectional streams (ID 4+)
+  - Interactive communication
+  end note
+  
+  :Client Unidirectional Streams;
+  note right
+  **Stream IDs: 2, 6, 10, 14, 18, 22, ...**
+  
+  Usage:
+  - HTTP/3 control stream (ID 2)
+  - HTTP/3 QPACK encoder stream
+  - HTTP/3 QPACK decoder stream
+  - WebTransport unidirectional streams
+  end note
+}
+
+partition "**Server-Initiated Streams**" {
+  :Server Bidirectional Streams;
+  note right
+  **Stream IDs: 1, 5, 9, 13, 17, 21, ...**
+  
+  Usage:
+  - Server-initiated communication
+  - Push streams (if supported)
+  - WebTransport bidirectional streams
+  - Response channels
+  end note
+  
+  :Server Unidirectional Streams;
+  note right
+  **Stream IDs: 3, 7, 11, 15, 19, 23, ...**
+  
+  Usage:
+  - HTTP/3 control stream (ID 3)
+  - Server push streams
+  - WebTransport unidirectional streams
+  - Telemetry/logging streams
+  end note
+}
+
+partition "**HTTP/3 Specific Usage**" {
+  :HTTP/3 Control Streams;
+  note right
+  **Control Stream Assignment:**
+  - Client control stream: ID 2
+  - Server control stream: ID 3
+  - Carries SETTINGS frames
+  - Must be first unidirectional stream
+  end note
+  
+  :HTTP/3 Request Streams;
+  note right
+  **Request Stream Assignment:**
+  - WebTransport CONNECT: ID 0
+  - Additional HTTP requests: ID 4, 8, 12, ...
+  - Each request gets new stream
+  - Bidirectional for request/response
+  end note
+  
+  :QPACK Streams (Optional);
+  note right
+  **QPACK Stream Assignment:**
+  - QPACK encoder stream: ID 6, 10, 14, ...
+  - QPACK decoder stream: ID 14, 18, 22, ...
+  - Used for dynamic table updates
+  - Rarely used in simple implementations
+  end note
+}
+
+partition "**WebTransport Stream Usage**" {
+  :WebTransport Session Streams;
+  note right
+  **After CONNECT Established:**
+  - Additional bidirectional: ID 4, 8, 12, ...
+  - Additional unidirectional: ID 6, 10, 14, ...
+  - Each stream = independent channel
+  - Application-specific purposes
+  end note
+  
+  :Stream Management;
+  note right
+  **Flow Control Limits:**
+  - MAX_STREAMS frame controls limits
+  - Client/server negotiate max streams
+  - Stream creation may block
+  - Proper cleanup required
+  end note
+}
+
+partition "**Stream Lifecycle Management**" {
+  :Stream Creation;
+  note right
+  **Creation Process:**
+  1. Check stream limits
+  2. Assign next available ID
+  3. Send stream frames
+  4. Notify peer via callbacks
+  end note
+  
+  :Stream Data Transfer;
+  note right
+  **Data Transfer:**
+  - STREAM frames carry data
+  - Flow control per stream
+  - Reliable, ordered delivery
+  - FIN marks end of stream
+  end note
+  
+  :Stream Termination;
+  note right
+  **Termination Methods:**
+  - Graceful: Send FIN, wait for peer FIN
+  - Reset: Send RST_STREAM frame
+  - Connection close: All streams terminate
+  - Proper cleanup in callbacks
+  end note
+}
+
+stop
+
+note left
+**Stream Management Best Practices:**
+- Use lowest available stream ID
+- Respect flow control limits
+- Clean up resources promptly
+- Handle stream resets gracefully
+- Monitor stream count limits
+end note
+
+@enduml

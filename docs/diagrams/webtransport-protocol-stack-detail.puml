@@ -1,0 +1,112 @@
+﻿@startuml
+!theme plain
+skinparam component {
+  BackgroundColor lightblue
+  BorderColor black
+}
+
+title WebTransport Protocol Stack
+
+package "**Client Side Protocol Stack**" {
+  component [WebTransport Client] as WTClient
+  note right of WTClient
+  **WebTransport Operations:**
+  - createBidirectionalStream()
+  - createUnidirectionalStream()
+  - sendDatagram()
+  - close()
+  end note
+  
+  component [HTTP/3 Client] as H3Client
+  note right of H3Client
+  **HTTP/3 Frames:**
+  - HEADERS (CONNECT)
+  - DATA
+  - SETTINGS
+  - Control stream management
+  end note
+  
+  component [QUIC Client] as QClient
+  note right of QClient
+  **QUIC Features:**
+  - Stream multiplexing
+  - Flow control
+  - Reliable delivery
+  - 0-RTT data
+  end note
+  
+  component [UDP Client] as UClient
+  note right of UClient
+  **UDP Transport:**
+  - Packet transmission
+  - Network interface
+  - Port binding
+  end note
+}
+
+package "**Network Layer**" {
+  cloud [Internet] as Net
+  note bottom of Net
+  **Network Characteristics:**
+  - Packet loss
+  - Reordering
+  - Latency variation
+  - Bandwidth limits
+  end note
+}
+
+package "**Server Side Protocol Stack**" {
+  component [UDP Server] as UServer
+  note left of UServer
+  **UDP Transport:**
+  - Packet reception
+  - Network interface
+  - Port listening
+  end note
+  
+  component [QUIC Server] as QServer
+  note left of QServer
+  **QUIC Processing:**
+  - Connection management
+  - Stream lifecycle
+  - Congestion control
+  - Loss recovery
+  end note
+  
+  component [HTTP/3 Server] as H3Server
+  note left of H3Server
+  **HTTP/3 Processing:**
+  - Parse CONNECT request
+  - Send 200 OK response
+  - Frame demultiplexing
+  - Error handling
+  end note
+  
+  component [WebTransport Server] as WTServer
+  note left of WTServer
+  **WebTransport Operations:**
+  - acceptBidirectionalStream()
+  - acceptUnidirectionalStream()
+  - receiveDatagram()
+  - close()
+  end note
+}
+
+' Data flow connections
+WTClient --> H3Client : WebTransport API calls
+H3Client --> QClient : HTTP/3 Frames
+QClient --> UClient : QUIC Packets
+UClient --> Net : UDP Datagrams
+
+Net --> UServer : UDP Datagrams
+UServer --> QServer : QUIC Packets
+QServer --> H3Server : HTTP/3 Frames
+H3Server --> WTServer : WebTransport API calls
+
+note bottom
+**Protocol Encapsulation:**
+WebTransport → HTTP/3 → QUIC → UDP → IP → Ethernet
+Each layer adds its own headers and functionality
+end note
+
+@enduml

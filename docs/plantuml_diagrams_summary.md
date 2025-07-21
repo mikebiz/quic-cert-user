@@ -465,6 +465,71 @@ The Event Flow Overview provides:
 [🔍 View SVG](svg/webtransport-protocol-stack-and-message-flow.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-protocol-stack-and-message-flow.puml)
 
+### 1: WebTransport Protocol Stack
+
+**WebTransport Protocol Stack**
+
+- **Purpose**: Shows the layered architecture from WebTransport down to UDP
+- **Features**: Client and server stacks with detailed component descriptions
+- **Layout**: Vertical stack showing protocol encapsulation
+
+![Diagram](images/webtransport-protocol-stack-detail.png)
+
+[🔍 View SVG](svg/webtransport-protocol-stack-detail.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-protocol-stack-detail.puml)
+
+### 2: WebTransport Message Flow Examples
+
+**WebTransport Message Flow Examples**
+
+- **Purpose**: Step-by-step message examples for common operations
+- **Features**: CONNECT handshake, stream communication, datagrams, session termination
+- **Layout**: Sequential flow through different message types
+
+- ![Diagram](images/webtransport-protocol-stack-detail.png)
+
+[🔍 View SVG](svg/webtransport-protocol-stack-detail.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-protocol-stack-detail.puml)
+
+### 3: QUIC Stream ID Allocation and Management
+
+**QUIC Stream ID Allocation and Management**
+
+- **Purpose**: Detailed explanation of stream ID assignment and usage
+- **Features**: Bit patterns, allocation rules, HTTP/3 usage, WebTransport usage
+- **Layout**: Stacked sections covering different aspects of stream management
+
+![Diagram](images/webtransport-quic-stream-id-allcation-and-management.png)
+
+[🔍 View SVG](svg/webtransport-quic-stream-id-allcation-and-management.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-quic-stream-id-allcation-and-management.puml)
+
+### 4: WebTransport Error Handling Scenarios
+
+**WebTransport Error Handling Scenarios**
+
+- **Purpose**: Comprehensive error handling at all protocol layers
+- **Features**: Connection errors, HTTP/3 errors, stream errors, recovery strategies
+- **Layout**: Vertical progression from connection-level to application-level errors
+
+![Diagram](images/webtransport-error-handling-scenarios.png)
+
+[🔍 View SVG](svg/webtransport-error-handling-scenarios.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-error-handling-scenarios.puml)
+
+### 5: WebTransport Performance Features and Optimizations
+
+**WebTransport Performance Features and Optimizations**
+
+- **Purpose**: Performance optimizations and advanced features
+- **Features**: 0-RTT, congestion control, flow control, security, implementation optimizations
+- **Layout**: Stacked performance categories with practical implementation details
+
+![Diagram](images/webtransport-performance-features-and-optimizations.png)
+
+[🔍 View SVG](svg/webtransport-performance-features-and-optimizations.svg)  
+[🧾 View Source (.puml)](diagrams/webtransport-performance-features-and-optimizations.puml)
+
 ---
 
 ## Implementation Checklist
