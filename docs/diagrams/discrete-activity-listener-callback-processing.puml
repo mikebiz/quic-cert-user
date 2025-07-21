@@ -35,107 +35,112 @@ partition "**Callback Invocation**" {
   end note
 }
 
-if (Event Type?) then (NEW_CONNECTION)
+partition "**Event Type Routing**" {
+  :Route to appropriate processor;
+  note right
+  **Event Processing Logic:**
+  Each event type requires
+  specific handling logic
+  end note
+}
+
+partition "**NEW_CONNECTION Processing**" {
+  :Extract Connection Info;
+  note right
+  **QUIC_NEW_CONNECTION_INFO:**
+  - QuicVersion
+  - LocalAddress
+  - RemoteAddress
+  - CryptoBuffer (TLS handshake)
+  - ClientAlpnList
+  - NegotiatedAlpn
+  - ServerName (SNI)
+  end note
   
-  partition "**NEW_CONNECTION Processing**" {
-    :Extract Connection Info;
-    note right
-    **QUIC_NEW_CONNECTION_INFO:**
-    - QuicVersion
-    - LocalAddress
-    - RemoteAddress
-    - CryptoBuffer (TLS handshake)
-    - ClientAlpnList
-    - NegotiatedAlpn
-    - ServerName (SNI)
-    end note
-    
-    :Validate Connection Request;
-    note right
-    **Validation Checks:**
-    - ALPN compatibility
-    - Source IP filtering
-    - Rate limiting
-    - Resource availability
-    - Authentication requirements
-    end note
-    
-    if (Accept Connection?) then (yes)
-      :Set Connection Callback;
-      note right
-      **SetCallbackHandler():**
-      - Assign connection callback function
-      - Set application context
-      - Enable connection event processing
-      end note
-      
-      :Set Connection Configuration;
-      note right
-      **ConnectionSetConfiguration():**
-      - Apply server TLS settings
-      - Set stream limits
-      - Configure flow control
-      - Enable features (datagrams, etc.)
-      end note
-      
-      :Return QUIC_STATUS_SUCCESS;
-      note right
-      **Connection Accepted:**
-      - Connection will proceed with handshake
-      - Application will receive connection events
-      - Resources allocated for connection
-      end note
-      
-    else (no)
-      :Return Error Status;
-      note right
-      **Connection Rejected:**
-      - QUIC_STATUS_UNREACHABLE
-      - QUIC_STATUS_CONNECTION_REFUSED
-      - Connection will be terminated
-      - No further events for this connection
-      end note
-    endif
-  }
+  :Validate Connection Request;
+  note right
+  **Validation Checks:**
+  - ALPN compatibility
+  - Source IP filtering
+  - Rate limiting
+  - Resource availability
+  - Authentication requirements
+  end note
   
-elseif (STOP_COMPLETE)
-  
-  partition "**STOP_COMPLETE Processing**" {
-    :Process Stop Complete;
+  if (Accept Connection?) then (yes)
+    :Set Connection Callback;
     note right
-    **STOP_COMPLETE Data:**
-    - AppCloseInProgress flag
-    - Indicates listener shutdown complete
-    - No more NEW_CONNECTION events
+    **SetCallbackHandler():**
+    - Assign connection callback function
+    - Set application context
+    - Enable connection event processing
     end note
     
-    :Cleanup Listener Resources;
+    :Set Connection Configuration;
     note right
-    **Cleanup Actions:**
-    - Free listener context
-    - Update server state
-    - Stop accepting connections
-    - Clean up port binding
-    end note
-    
-    :Notify Application;
-    note right
-    **Application Notification:**
-    - Server shutdown complete
-    - Safe to close listener handle
-    - Update connection tracking
+    **ConnectionSetConfiguration():**
+    - Apply server TLS settings
+    - Set stream limits
+    - Configure flow control
+    - Enable features (datagrams, etc.)
     end note
     
     :Return QUIC_STATUS_SUCCESS;
     note right
-    **Listener Stopped:**
-    - No more events on this listener
-    - Safe to call ListenerClose()
-    - Server can shutdown gracefully
+    **Connection Accepted:**
+    - Connection will proceed with handshake
+    - Application will receive connection events
+    - Resources allocated for connection
     end note
-  }
+    
+  else (no)
+    :Return Error Status;
+    note right
+    **Connection Rejected:**
+    - QUIC_STATUS_UNREACHABLE
+    - QUIC_STATUS_CONNECTION_REFUSED
+    - Connection will be terminated
+    - No further events for this connection
+    end note
+  endif
+}
+
+partition "**STOP_COMPLETE Processing**" {
+  :Process Stop Complete;
+  note right
+  **STOP_COMPLETE Data:**
+  - AppCloseInProgress flag
+  - Indicates listener shutdown complete
+  - No more NEW_CONNECTION events
+  end note
   
-else (Unknown Event)
+  :Cleanup Listener Resources;
+  note right
+  **Cleanup Actions:**
+  - Free listener context
+  - Update server state
+  - Stop accepting connections
+  - Clean up port binding
+  end note
+  
+  :Notify Application;
+  note right
+  **Application Notification:**
+  - Server shutdown complete
+  - Safe to close listener handle
+  - Update connection tracking
+  end note
+  
+  :Return QUIC_STATUS_SUCCESS;
+  note right
+  **Listener Stopped:**
+  - No more events on this listener
+  - Safe to call ListenerClose()
+  - Server can shutdown gracefully
+  end note
+}
+
+partition "**Unknown Event Processing**" {
   :Log Unknown Event;
   note right
   **Error Handling:**
@@ -150,7 +155,7 @@ else (Unknown Event)
   Unknown events are ignored
   to maintain compatibility
   end note
-endif
+}
 
 partition "**Error Handling**" {
   if (Callback Error?) then (yes)
@@ -201,4 +206,5 @@ note right
 - Connection acceptance is critical path
 - Error handling affects server availability
 end note
+
 @enduml

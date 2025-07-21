@@ -1,12 +1,30 @@
 # QUIC/HTTP/3/WebTransport PlantUML Diagrams - Complete Reference
 
+## Table of Contents
+1. [Document Overview](#document-overview)
+2. [Summary of Diagrams](#summary-of-diagrams)
+3. [Key Insights from the Diagrams](#key-insights-from-the-diagrams)
+4. [Practical Usage](#practical-usage)
+5. [Component Dependencies](#component-dependencies)
+6. [WebTransport Sequence](#webtransport-sequence)
+7. [State Transitions](#state-transitions)
+8. [Event Flow and Callbacks](#event-flow-and-callbacks)
+9. [WebTransport Protocol Stack](#webtransport-protocol-stack)
+10. [Implementation Checklist](#implementation-checklist)
+11. [Testing Scenarios](#testing-scenarios)
+12. [Performance Considerations](#performance-considerations)
+13. [Troubleshooting Guide](#troubleshooting-guide)
+14. [Conclusion](#conclusion)
+
 ## Document Overview
+[Table of Contents](#table-of-contents)
 
 This document provides a comprehensive set of PlantUML diagrams that document the complete QUIC/HTTP/3/WebTransport architecture. These diagrams serve as both implementation guides and debugging references for building WebTransport applications using Microsoft's MsQuic library.
 
 ---
 
 ## Summary of Diagrams
+[Table of Contents](#table-of-contents)
 
 There are five comprehensive PlantUML diagrams that document the complete QUIC/HTTP/3/WebTransport architecture:
 
@@ -49,6 +67,7 @@ There are five comprehensive PlantUML diagrams that document the complete QUIC/H
 ---
 
 ## Key Insights from the Diagrams
+[Table of Contents](#table-of-contents)
 
 ### **Critical Dependencies:**
 1. **Registration** must exist before any other MsQuic objects
@@ -80,6 +99,7 @@ INITIALIZING → CONNECTING → CONNECTED → CLOSING → CLOSED
 ---
 
 ## Practical Usage
+[Table of Contents](#table-of-contents)
 
 ### **For Implementation:**
 - Use the **component diagram** to understand object relationships
@@ -110,16 +130,15 @@ INITIALIZING → CONNECTING → CONNECTED → CLOSING → CLOSED
 
 ---
 
-## PlantUML Diagram Source Code
-
-### Diagram 1: Component Dependencies
+## Component Dependencies
+[Table of Contents](#table-of-contents)
 
 ![Diagram](images/quic-http3-webtransport-component_dependencies.png)
 
 [🔍 View SVG](svg/quic-http3-webtransport-component_dependencies.svg)  
 [🧾 View Source (.puml)](diagrams/quic-http3-webtransport-component_dependencies.puml)
 
-#### 1: Application Layer Components
+### 1: Application Layer Components
 
 Shows WebTransport and HTTP/3 applications
 
@@ -128,7 +147,7 @@ Shows WebTransport and HTTP/3 applications
 [🔍 View SVG](svg/comprehensive-components-application-layer.svg)  
 [🧾 View Source (.puml)](diagrams/comprehensive-components-application-layer.puml)
 
-#### 2: WebTransport Protocol Components
+### 2: WebTransport Protocol Components
 
 Shows session, streams, and datagrams management
 
@@ -137,7 +156,7 @@ Shows session, streams, and datagrams management
 [🔍 View SVG](svg/comprehensive-components-webtransport-protocols.svg)  
 [🧾 View Source (.puml)](diagrams/comprehensive-components-webtransport-protocols.puml)
 
-#### 3: HTTP/3 Protocol Components
+### 3: HTTP/3 Protocol Components
 
 Shows frame parsing, QPACK, and stream types
 
@@ -146,7 +165,7 @@ Shows frame parsing, QPACK, and stream types
 [🔍 View SVG](svg/comprehensive-components-http3-protocols.svg)  
 [🧾 View Source (.puml)](diagrams/comprehensive-components-http3-protocols.puml)
 
-#### 4: MsQuic Layer Components
+### 4: MsQuic Layer Components
 
 Shows all MsQuic API objects and relationships
 
@@ -155,7 +174,7 @@ Shows all MsQuic API objects and relationships
 [🔍 View SVG](svg/comprehensive-components-msquic-layer.svg)  
 [🧾 View Source (.puml)](diagrams/comprehensive-components-msquic-layer.puml)
 
-#### 5: Transport Layer Components
+### 5: Transport Layer Components
 
 Shows UDP and network interface details
 
@@ -172,7 +191,7 @@ Each diagram uses interface elements with clear annotations to reference connect
 - **Reference Notes**: Clear annotations like "Reference: WebTransport Protocol Diagram"
 - **Connection Descriptions**: Detailed notes explaining what data flows between layers
 
-#### 6: Overview Diagram
+### 6: Overview Diagram
 
 The 6th diagram provides a **high-level overview** showing how all 5 layers connect, with:
 
@@ -186,70 +205,72 @@ The 6th diagram provides a **high-level overview** showing how all 5 layers conn
 [🔍 View SVG](svg/comprehensive-components-dependencies-overview.svg)  
 [🧾 View Source (.puml)](diagrams/comprehensive-components-dependencies-overview.puml)
 
-### Diagram 2: WebTransport Sequence
+## WebTransport Sequence
+[Table of Contents](#table-of-contents)
 
 ![Diagram](images/webtransport-over-quic-http3-complete-sequence.png)
 
 [🔍 View SVG](svg/webtransport-over-quic-http3-complete-sequence.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-over-quic-http3-complete-sequence.puml)
 
-#### 1: Initialization Phase
+### 1: Initialization Phase
 
 ![Diagram](images/webtransport-seq-initialization-phase.png)
 
 [🔍 View SVG](svg/webtransport-seq-initialization-phase.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-initialization-phase.puml)
 
-#### 2: QUIC Connection Establishment
+### 2: QUIC Connection Establishment
 
 ![Diagram](images/webtransport-seq-quic-connection-establishment.png)
 
 [🔍 View SVG](svg/webtransport-seq-quic-connection-establishment.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-quic-connection-establishment.puml)
 
-#### 3: HTTP/3 Settings Exchange
+### 3: HTTP/3 Settings Exchange
 
 ![Diagram](images/webtransport-seq-http3-settings-exchange.png)
 
 [🔍 View SVG](svg/webtransport-seq-http3-settings-exchange.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-http3-settings-exchange.puml)
 
-#### 4: WebTransport CONNECT Request
+### 4: WebTransport CONNECT Request
 
 ![Diagram](images/webtransport-seq-wt-connect-request.png)
 
 [🔍 View SVG](svg/webtransport-seq-wt-connect-request.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-wt-connect-request.puml)
 
-#### 5: WebTransport Session Establishment
+### 5: WebTransport Session Establishment
 
 ![Diagram](images/webtransport-seq-wt-session-establishment.png)
 
 [🔍 View SVG](svg/webtransport-seq-wt-session-establishment.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-wt-session-establishment.puml)
 
-#### 6: WebTransport Data Exchange
+### 6: WebTransport Data Exchange
 
 ![Diagram](images/webtransport-seq-wt-data-exchange.png)
 
 [🔍 View SVG](svg/webtransport-seq-wt-data-exchange.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-wt-data-exchange.puml)
 
-#### 7: Graceful Shutdown
+### 7: Graceful Shutdown
 
 ![Diagram](images/webtransport-seq-graceful-shutdown.png)
 
 [🔍 View SVG](svg/webtransport-seq-graceful-shutdown.svg)  
 [🧾 View Source (.puml)](diagrams/webtransport-seq-graceful-shutdown.puml)
 
-### Diagram 3: State Transitions
+## State Transitions
+[Table of Contents](#table-of-contents)
 
 ![Diagram](images/quic-http3-webtransport-state-transitions.png)
 
 [🔍 View SVG](svg/quic-http3-webtransport-state-transitions.svg)  
 [🧾 View Source (.puml)](diagrams/quic-http3-webtransport-state-transitions.puml)
 
-#### 1: QUIC Connection State
+### 1: QUIC Connection State
 
 **QUIC Connection States** (`quic_connection_states`)
 
@@ -263,7 +284,7 @@ The 6th diagram provides a **high-level overview** showing how all 5 layers conn
 [🔍 View SVG](svg/discrete-state-quic-connection.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-state-quic-connection.puml)
 
-#### 2: QUIC Stream Transitions
+### 2: QUIC Stream Transitions
 
 **QUIC Stream States** (`quic_stream_states`)
 
@@ -278,7 +299,7 @@ The 6th diagram provides a **high-level overview** showing how all 5 layers conn
 [🔍 View SVG](svg/discrete-state-quic-streams-transitions.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-state-quic-streams-transitions.puml)
 
-#### 3: HTTP/3 Layer State Transitions
+### 3: HTTP/3 Layer State Transitions
 
 **HTTP/3 Layer States** (`http3_layer_states`)
 
@@ -293,7 +314,7 @@ The 6th diagram provides a **high-level overview** showing how all 5 layers conn
 [🔍 View SVG](svg/discrete-state-http3-layer-transitions.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-state-http3-layer-transitions.puml)
 
-#### 4: WebTransport Session State Transitions
+### 4: WebTransport Session State Transitions
 
 **WebTransport Session States** (`webtransport_session_states`)
 
@@ -316,7 +337,7 @@ Each diagram includes interface annotations that reference other diagrams:
 - **Dependency arrows** showing which states enable others
 - **Cross-layer interactions** clearly documented
 
-#### 5: Transitions Overview
+### 5: Transitions Overview
 
 **Overview Diagram Features**:
 
@@ -334,14 +355,15 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-state-transitions-overview.puml.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-state-transitions-overview.puml)
 
-### Diagram 4: Event Flow and Callbacks
+## Event Flow and Callbacks
+[Table of Contents](#table-of-contents)
 
 ![Diagram](images/msquic-event-flow-and-callback-triggers.png)
 
 [🔍 View SVG](svg/msquic-event-flow-and-callback-triggers.svg)  
 [🧾 View Source (.puml)](diagrams/msquic-event-flow-and-callback-triggers.puml)
 
-#### 1: Application Layer Event Flow
+### 1: Application Layer Event Flow
 
 **Application Layer Event Flow (`application_layer_flow`)**
 
@@ -355,7 +377,7 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-activity-application-layer.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-application-layer.puml)
 
-#### 2: MsQuic Core Event Processing
+### 2: MsQuic Core Event Processing
 
 **MsQuic Core Event Processing (`msquic_core_flow`)**
 
@@ -369,7 +391,7 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-activity-msquic-core-event-processing.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-msquic-core-event-processing.puml)
 
-#### 3: Listener Callback Processing
+### 3: Listener Callback Processing
 
 **Listener Callback Processing (`listener_callback_flow`) - EXPANDED & RESTRUCTURED**
 
@@ -387,7 +409,7 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-activity-listener-callback-processing.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-listener-callback-processing.puml)
 
-#### 4: Connection Callback Processing
+### 4: Connection Callback Processing
 
 **Connection Callback Processing (`connection_callback_flow`) - EXPANDED & RESTRUCTURED**
 
@@ -403,7 +425,7 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-activity-connection-callback-processing.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-connection-callback-processing.puml)
 
-#### 5: Stream Callback Processing
+### 5: Stream Callback Processing
 
 **Stream Callback Processing (`stream_callback_flow`) - NEW DEDICATED DIAGRAM**
 
@@ -418,7 +440,7 @@ The **State Transitions Overview** provides:
 [🔍 View SVG](svg/discrete-activity-stream-callback-processing.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-stream-callback-processing.puml)
 
-#### 6: Overview Diagram
+### 6: Overview Diagram
 
 **Overview Diagram Benefits**:
 
@@ -435,7 +457,8 @@ The Event Flow Overview provides:
 [🔍 View SVG](svg/discrete-activity-event-flow-overview.svg)  
 [🧾 View Source (.puml)](diagrams/discrete-activity-event-flow-overview.puml)
 
-### Diagram 5: WebTransport Protocol Stack
+## WebTransport Protocol Stack
+[Table of Contents](#table-of-contents)
 
 ![Diagram](images/webtransport-protocol-stack-and-message-flow.png)
 
@@ -445,6 +468,7 @@ The Event Flow Overview provides:
 ---
 
 ## Implementation Checklist
+[Table of Contents](#table-of-contents)
 
 ### **Based on Component Dependencies:**
 - [ ] Initialize Registration before any other objects
@@ -481,6 +505,7 @@ The Event Flow Overview provides:
 ---
 
 ## Testing Scenarios
+[Table of Contents](#table-of-contents)
 
 ### **Connection Establishment:**
 1. Successful QUIC handshake with valid certificate
@@ -515,6 +540,7 @@ The Event Flow Overview provides:
 ---
 
 ## Performance Considerations
+[Table of Contents](#table-of-contents)
 
 ### **Connection Level:**
 - Use appropriate execution profiles (LOW_LATENCY vs MAX_THROUGHPUT)
@@ -537,6 +563,7 @@ The Event Flow Overview provides:
 ---
 
 ## Troubleshooting Guide
+[Table of Contents](#table-of-contents)
 
 ### **Connection Issues:**
 - Check certificate configuration and validity
@@ -565,6 +592,7 @@ The Event Flow Overview provides:
 ---
 
 ## Conclusion
+[Table of Contents](#table-of-contents)
 
 These diagrams provide a complete reference for implementing WebTransport over QUIC using MsQuic, covering everything from low-level callback handling to high-level protocol flows. They serve as both implementation guides and debugging references for building robust, high-performance WebTransport applications.
 
